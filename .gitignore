@@ -1,43 +1,51 @@
-# Python
+#Environment
+.env
+.env.*
+
+#Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Virtual environments
 venv/
 .venv/
 env/
 
+#Frontend (Vite)
+node_modules/
+dist/
+.vite/
 
-# Environment variables
-.env
+# AI / Data
+chroma_db/
+*.db
+*.sqlite3
+*.parquet
 
-# IDE
+
+# Database dumps
+*.sql
+*.dump
+
+#Docker
+*.log
+docker-compose.override.yml
+
+#IDE
 .vscode/
 .idea/
 
+#OS
+.DS_Store
+Thumbs.db
 
-# Airflow
+#Temp files
+*.tmp
+*.temp
+
+#Airflow
 logs/
 airflow.db
 airflow.cfg
 airflow-webserver.pid
-
-
-
-# ChromaDB
-chroma_db/
-
-#os
-.DS_Store
-Thumbs.db
-
-
-# Docker
-*.log
-docker-compose.override.yml
-
-#trmporery files
-*.tmp
-*.temp
