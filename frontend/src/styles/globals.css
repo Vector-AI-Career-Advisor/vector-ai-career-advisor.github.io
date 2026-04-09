@@ -3,22 +3,26 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #0a0a0f;
-  --surface:   #111118;
-  --surface2:  #1a1a24;
-  --border:    #ffffff12;
-  --border2:   #ffffff22;
-  --text:      #f0f0f8;
-  --muted:     #7a7a9a;
-  --accent:    #7c6af7;
-  --accent2:   #c4b5fd;
+  --bg:        #0b0a12;   /* deep purple-black */
+  --surface:   #151225;   /* dark violet */
+  --surface2:  #1d1833;
+
+  --border:    #ffffff14;
+  --border2:   #ffffff26;
+
+  --text:      #f5f3ff;   /* soft white */
+  --muted:     #a78bbf;   /* muted lavender */
+
+  --accent:    #ec4899;   /* pink */
+  --accent2:   #8b5cf6;   /* purple */
+
   --green:     #34d399;
   --orange:    #fb923c;
   --red:       #f87171;
 
-  --font-display: 'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
-  --font-mono:    'DM Mono', monospace;
+  --font-display: 'Poppins', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'Inter', monospace;
 
   --radius:  12px;
   --radius-lg: 20px;

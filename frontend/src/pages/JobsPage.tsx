@@ -67,7 +67,7 @@ export default function JobsPage() {
       <nav className="navbar">
         <div className="navbar-brand">
           <span className="logo-icon">◈</span>
-          <span className="logo-text">Jobr</span>
+          <span className="logo-text">Vector</span>
         </div>
         <div className="navbar-right">
           <span className="jobs-count">{jobs.length} listings</span>

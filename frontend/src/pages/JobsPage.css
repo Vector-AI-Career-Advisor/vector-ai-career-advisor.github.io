@@ -181,10 +181,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 1rem;
+  align-items: stretch;
 }
 
 .card-wrapper {
   animation: cardIn 0.35s ease both;
+  height: 100%;
+  display: flex;
 }
 
 @keyframes cardIn {
@@ -263,5 +266,5 @@
   .filter-group { min-width: 180px; flex: 1; }
 
   .jobs-main { padding: 1.25rem; }
-  .jobs-grid { grid-template-columns: 1fr; }
+  .jobs-grid { grid-template-columns: 1fr; align-items: stretch;}
 }

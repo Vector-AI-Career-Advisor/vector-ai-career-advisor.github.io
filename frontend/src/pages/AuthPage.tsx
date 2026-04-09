@@ -20,14 +20,15 @@ export default function AuthPage() {
         <div className="auth-hero-content">
           <div className="auth-logo">
             <span className="logo-icon">◈</span>
-            <span className="logo-text">Jobr</span>
+            <span className="logo-text">Vector</span>
           </div>
           <h1 className="auth-headline">
-            Your next role<br />
-            <em>is already here.</em>
+           Discover your next opportunity<br />
+          <em>with Vector.</em>
           </h1>
           <p className="auth-sub">
-            AI-curated job listings from LinkedIn, updated daily.
+            Vector is your AI-powered career companion — delivering fresh job opportunities daily, 
+            helping you tailor your resume, and guiding you toward roles that truly match your skills.
           </p>
           <div className="auth-stats">
             <div className="stat">

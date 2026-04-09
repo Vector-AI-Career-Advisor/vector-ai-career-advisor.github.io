@@ -13,10 +13,12 @@
   justify-content: center;
   overflow: hidden;
   padding: 3rem;
+  
 }
 
 .auth-hero-content {
-  position: relative;
+  text-align: center;
+  position: center;
   z-index: 2;
 }
 
@@ -64,12 +66,18 @@
   max-width: 340px;
   line-height: 1.7;
   margin-bottom: 2.5rem;
+  text-align: center;   
+  margin-left: auto;
+  margin-right: auto; 
 }
 
 .auth-stats {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  display: flex;
+  justify-content: center;   /* center all stats */
+  align-items: center;
 }
 
 .stat {
@@ -108,6 +116,7 @@
   height: 600px;
   background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
   pointer-events: none;
+  
 }
 
 .auth-orb {
@@ -302,7 +311,9 @@
     grid-template-columns: 1fr;
   }
   .auth-hero {
-    display: none;
+    
+    text-align: center;
+    position: center;
   }
   .auth-panel {
     padding: 1.5rem 1rem;
