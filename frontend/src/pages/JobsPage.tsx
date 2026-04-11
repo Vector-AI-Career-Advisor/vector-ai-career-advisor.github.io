@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchJobs, Job } from '../api/jobs'
 import { useAuth } from '../hooks/useAuth'
 import JobCard from '../components/JobCard'
@@ -6,13 +6,18 @@ import JobDrawer from '../components/JobDrawer'
 import './JobsPage.css'
 
 const SENIORITIES = ['', 'Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
+const LIMIT = 50
 
 export default function JobsPage() {
   const { handleLogout } = useAuth()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Job | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [total, setTotal] = useState(0)
 
   // Filters
   const [keyword, setKeyword] = useState('')
@@ -20,23 +25,33 @@ export default function JobsPage() {
   const [location, setLocation] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
 
+  // Sentinel ref for IntersectionObserver
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
   // Debounce keyword
   useEffect(() => {
     const t = setTimeout(() => setDebouncedKeyword(keyword), 350)
     return () => clearTimeout(t)
   }, [keyword])
 
+  // Reset and reload when filters change
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setOffset(0)
+    setHasMore(true)
     try {
-      const data = await fetchJobs({
+      const res = await fetchJobs({
         keyword: debouncedKeyword || undefined,
         seniority: seniority || undefined,
         location: location || undefined,
-        limit: 60,
+        limit: LIMIT,
+        offset: 0,
       })
-      setJobs(data)
+      setJobs(res.items)
+      setTotal(res.total)
+      setHasMore(res.items.length < res.total)
+      setOffset(res.items.length)
     } catch {
       setError('Failed to load jobs. Please try again.')
     } finally {
@@ -45,6 +60,48 @@ export default function JobsPage() {
   }, [debouncedKeyword, seniority, location])
 
   useEffect(() => { load() }, [load])
+
+  // Load next page
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const res = await fetchJobs({
+        keyword: debouncedKeyword || undefined,
+        seniority: seniority || undefined,
+        location: location || undefined,
+        limit: LIMIT,
+        offset,
+      })
+      setJobs(prev => [...prev, ...res.items])
+      setTotal(res.total)
+      const newOffset = offset + res.items.length
+      setOffset(newOffset)
+      setHasMore(newOffset < res.total)
+    } catch {
+      // silently fail on load-more; user can scroll back to retry
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, hasMore, offset, debouncedKeyword, seniority, location])
+
+  // IntersectionObserver watches the sentinel div at the bottom
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadMore])
 
   // Close drawer on Escape
   useEffect(() => {
@@ -70,7 +127,7 @@ export default function JobsPage() {
           <span className="logo-text">Vector</span>
         </div>
         <div className="navbar-right">
-          <span className="jobs-count">{jobs.length} listings</span>
+          <span className="jobs-count">{total} listings</span>
           <button className="btn-logout" onClick={handleLogout}>
             Sign out
           </button>
@@ -153,17 +210,33 @@ export default function JobsPage() {
               )}
             </div>
           ) : (
-            <div className="jobs-grid">
-              {jobs.map((job, i) => (
-                <div
-                  key={job.id}
-                  style={{ animationDelay: `${Math.min(i * 30, 400)}ms` }}
-                  className="card-wrapper"
-                >
-                  <JobCard job={job} onClick={() => setSelected(job)} />
+            <>
+              <div className="jobs-grid">
+                {jobs.map((job, i) => (
+                  <div
+                    key={job.id}
+                    style={{ animationDelay: `${Math.min(i * 30, 400)}ms` }}
+                    className="card-wrapper"
+                  >
+                    <JobCard job={job} onClick={() => setSelected(job)} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Sentinel element — triggers loadMore when visible */}
+              <div ref={sentinelRef} style={{ height: 1 }} />
+
+              {loadingMore && (
+                <div className="jobs-loading-more">
+                  <div className="spinner spinner-sm" />
+                  <p>Loading more…</p>
                 </div>
-              ))}
-            </div>
+              )}
+
+              {!hasMore && jobs.length > 0 && (
+                <p className="jobs-end-message">You've seen all {total} listings</p>
+              )}
+            </>
           )}
         </main>
       </div>

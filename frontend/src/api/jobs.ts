@@ -12,6 +12,7 @@ export interface Job {
   skills_must?: string[]
   skills_nice?: string[]
   yearsexperience?: number
+  past_experience?: string[]
   keyword?: string
   source?: string
   posted_at?: string
@@ -26,7 +27,12 @@ export interface JobFilters {
   offset?: number
 }
 
-export const fetchJobs = async (filters: JobFilters = {}): Promise<Job[]> => {
+export interface JobsResponse {
+  items: Job[]
+  total: number
+}
+
+export const fetchJobs = async (filters: JobFilters = {}): Promise<JobsResponse> => {
   const { data } = await api.get('/jobs/', { params: filters })
   return data
 }

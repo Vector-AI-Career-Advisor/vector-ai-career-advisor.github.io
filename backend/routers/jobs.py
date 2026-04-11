@@ -6,14 +6,16 @@ from models.schemas import JobOut
 
 router = APIRouter()
 
+LIMIT = 50
 
-@router.get("/", response_model=List[JobOut])
+
+@router.get("/")
 def list_jobs(
     user_id: str = Depends(get_current_user),
     keyword: Optional[str] = Query(None),
     seniority: Optional[str] = Query(None),
     location: Optional[str] = Query(None),
-    limit: int = Query(50, le=200),
+    limit: int = Query(LIMIT),
     offset: int = Query(0),
 ):
     conn = get_connection()
@@ -36,7 +38,8 @@ def list_jobs(
 
         with conn.cursor() as cur:
             cur.execute(f"""
-                SELECT id, title, role, seniority, company, location, url,
+                SELECT COUNT(*) OVER() AS total_count,
+                       id, title, role, seniority, company, location, url,
                        description, skills_must, skills_nice, yearsexperience,
                        past_experience, keyword, source, posted_at, scraped_at
                 FROM jobs
@@ -44,8 +47,21 @@ def list_jobs(
                 ORDER BY scraped_at DESC
                 LIMIT %s OFFSET %s;
             """, params)
+
+            rows = cur.fetchall()
+            if not rows:
+                return {"items": [], "total": 0}
+
             cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            total = rows[0][0]  # total_count from window function
+            items = []
+
+            for row in rows:
+                row_dict = dict(zip(cols, row))
+                row_dict.pop("total_count")
+                items.append(row_dict)
+
+            return {"items": items, "total": total}
     finally:
         conn.close()
 
@@ -63,8 +79,8 @@ def get_job(job_id: str, user_id: str = Depends(get_current_user)):
             """, (job_id,))
             row = cur.fetchone()
             if not row:
-                from fastapi import HTTPException
-                raise HTTPException(status_code=404, detail="Job not found")
+                return None
+
             cols = [d[0] for d in cur.description]
             return dict(zip(cols, row))
     finally:
