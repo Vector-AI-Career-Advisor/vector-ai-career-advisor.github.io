@@ -53,6 +53,44 @@
   border-color: var(--border2);
 }
 
+/* ── Agent: Master two-column split ── */
+.page-columns {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  height: calc(100vh - 60px); /* matches navbar height */
+  overflow: hidden;
+}
+
+/* Left column wraps the existing jobs layout */
+.left-column {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.left-column .jobs-layout {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.left-column .jobs-main {
+  overflow-y: auto;
+  height: 100%;
+}
+
+.left-column .jobs-sidebar {
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* Right column: chat agent panel */
+.right-column {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* ── Layout ── */
 .jobs-layout {
   display: grid;
@@ -245,8 +283,21 @@
 
 .btn-retry:hover { border-color: var(--border2); }
 
-/* Responsive */
+/* ── Responsive ── */
 @media (max-width: 900px) {
+  /* Agent columns: stack vertically */
+  .page-columns {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    height: auto;
+  }
+
+  .right-column {
+    height: 480px;
+    border-top: 0.5px solid var(--color-border-tertiary);
+  }
+
+  /* Jobs layout: collapse sidebar */
   .jobs-layout {
     grid-template-columns: 1fr;
   }
@@ -266,5 +317,5 @@
   .filter-group { min-width: 180px; flex: 1; }
 
   .jobs-main { padding: 1.25rem; }
-  .jobs-grid { grid-template-columns: 1fr; align-items: stretch;}
+  .jobs-grid { grid-template-columns: 1fr; align-items: stretch; }
 }
