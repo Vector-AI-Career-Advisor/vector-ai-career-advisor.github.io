@@ -25,7 +25,7 @@ class State(TypedDict):
 def build_llm():
     return ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5",
         temperature=0,
     )
 
