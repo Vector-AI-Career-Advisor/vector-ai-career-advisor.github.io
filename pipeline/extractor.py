@@ -1,106 +1,76 @@
 """
-LLM-based job description extraction using Groq.
+LLM-based job description extraction using Claude Haiku.
 """
 from __future__ import annotations
 import json
 import logging
-import random
-import re
 import time
-from groq import APIConnectionError, Groq, RateLimitError
+import re
+import anthropic
 from config import (
     EXTRACTION_PROMPT,
-    GROQ_API_KEY_CHAT,
-    GROQ_API_KEY_EXTRACT,
-    GROQ_MODEL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
     VALID_ROLES,
     VALID_SENIORITY,
 )
 
 log = logging.getLogger(__name__)
 
-# ── Groq client state ─────────────────────────────────────────────────────────
-
-_GROQ_KEYS = [k for k in [GROQ_API_KEY_EXTRACT, GROQ_API_KEY_CHAT] if k]
-_key_index  = 0
-
-# Groq free tier: ~30 req/min per key → enforce a minimum gap between requests
-_MIN_GAP_SECONDS   = 3.0
-_last_request_time = 0.0
-
-
-def _get_client() -> Groq:
-    return Groq(api_key=_GROQ_KEYS[_key_index % len(_GROQ_KEYS)])
-
-
-def _rotate_key() -> None:
-    global _key_index
-    _key_index += 1
-    log.info("Groq key rotated → key %d/%d", (_key_index % len(_GROQ_KEYS)) + 1, len(_GROQ_KEYS))
-
-
-def _throttle() -> None:
-    """Sleep if needed to stay under the per-minute rate limit."""
-    global _last_request_time
-    wait = _MIN_GAP_SECONDS - (time.time() - _last_request_time)
-    if wait > 0:
-        time.sleep(wait)
-    _last_request_time = time.time()
+_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def extract_with_groq(title: str, description: str) -> dict:
+def extract_with_claude(title: str, description: str) -> dict:
     """
-    Send a job title + description to Groq and return a structured extraction.
-    Retries up to 3 times with key rotation on rate-limit errors.
+    Send a job title + description to Claude Haiku and return a structured extraction.
+    Retries up to 3 times on transient errors.
     """
     if not description or description == "N/A":
         return _empty_extraction()
 
-    client = _get_client()
-
     for attempt in range(3):
         try:
-            _throttle()
-            response = client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "system", "content": EXTRACTION_PROMPT},
-                    {"role": "user",   "content": f"Job Title: {title}\n\nJob Description:\n{description[:5000]}\n\nJSON:"},
-                ],
-                temperature=0,
+            response = _client.messages.create(
+                model=ANTHROPIC_MODEL,
                 max_tokens=2000,
+                temperature=0,
+                system=[
+                    {
+                        "type": "text",
+                        "text": EXTRACTION_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[
+                    {"role": "user", "content": f"Job Title: {title}\n\nJob Description:\n{description[:5000]}\n\nJSON:"},
+                ],
             )
-            raw = response.choices[0].message.content.strip()
+            raw = response.content[0].text.strip()
             return _parse_and_validate(raw, title)
 
         except json.JSONDecodeError as e:
-            log.warning("Groq JSON parse error (attempt %d/3): %s", attempt + 1, e)
+            log.warning("Claude JSON parse error (attempt %d/3): %s", attempt + 1, e)
             if attempt == 2:
                 return _empty_extraction()
             time.sleep(2)
 
-        except RateLimitError as e:
-            err = str(e)
-            if "tokens per day" in err or "TPD" in err:
-                log.warning("Groq daily token limit reached — skipping job.")
+        except anthropic.RateLimitError as e:
+            wait = (2 ** attempt) * 20
+            log.warning("Claude rate limit — waiting %.0fs (attempt %d/3): %s", wait, attempt + 1, e)
+            if attempt == 2:
                 return _empty_extraction()
-
-            _rotate_key()
-            client = _get_client()
-            wait   = (2 ** attempt) * 20 + random.uniform(0, 10)
-            log.warning("Groq rate limit — rotated key, waiting %.0fs (attempt %d/3).", wait, attempt + 1)
             time.sleep(wait)
 
-        except APIConnectionError as e:
-            log.warning("Groq connection error (attempt %d/3): %s", attempt + 1, e)
+        except anthropic.APIConnectionError as e:
+            log.warning("Claude connection error (attempt %d/3): %s", attempt + 1, e)
             if attempt == 2:
                 return _empty_extraction()
             time.sleep(5)
 
         except Exception as e:
-            log.warning("Groq unexpected error (attempt %d/3): %s", attempt + 1, e)
+            log.warning("Claude unexpected error (attempt %d/3): %s", attempt + 1, e)
             if attempt == 2:
                 return _empty_extraction()
             time.sleep(2)
@@ -137,12 +107,12 @@ def _empty_extraction() -> dict:
 
 
 def _validate(data: dict, title: str) -> dict:
-    """Validate and normalise a raw Groq extraction dict."""
+    """Validate and normalise a raw Claude extraction dict."""
     empty  = _empty_extraction()
     result = {}
 
     for key, default in empty.items():
-        # Groq sometimes returns "experience" instead of "yearsexperience"
+        # LLM sometimes returns "experience" instead of "yearsexperience"
         llm_key = "experience" if key == "yearsexperience" else key
         val     = data.get(llm_key, data.get(key, default))
 

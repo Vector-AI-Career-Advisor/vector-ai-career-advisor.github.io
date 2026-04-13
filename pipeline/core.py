@@ -17,7 +17,7 @@ from db.postgres import (
     init_db,
     insert_jobs,
 )
-from pipeline.extractor import extract_with_groq
+from pipeline.extractor import extract_with_claude
 from pipeline.utils import fmt
 from scraper.scraper import build_driver, scrape_keyword
 
@@ -96,7 +96,7 @@ def run_extract(stubs: List[dict]) -> List[dict]:
     jobs = []
     for i, stub in enumerate(stubs, start=1):
         log.info("[%d/%d] Extracting: %s | %s", i, len(stubs), stub["title"], stub["company"])
-        extracted = extract_with_groq(stub["title"], stub["raw_description"])
+        extracted = extract_with_claude(stub["title"], stub["raw_description"])
 
         job = {
             "id":              stub["id"],

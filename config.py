@@ -12,10 +12,9 @@ DB_CONFIG = {
     "password": os.getenv("DB_PASSWORD"),
 }
 
-# ───────── Groq config ─────────
-GROQ_API_KEY_EXTRACT = os.getenv("GROQ_API_KEY_EXTRACT")
-GROQ_API_KEY_CHAT = os.getenv("GROQ_API_KEY_CHAT")
-GROQ_MODEL = os.getenv("GROQ_MODEL")
+# ───────── Anthropic config ─────────
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
 
 # ───────── Other configs (unchanged) ─────────
 EMBEDDING_DIM = 1536
@@ -27,7 +26,7 @@ CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
 
 # ───────── Scraper ─────────
 DAILY_TARGET = 50
-CHROME_VERSION = 145
+CHROME_VERSION = 147
 DATE_FILTER = "r604800" #"r86400" last 24 hours,"r604800"last 7 days,"r2592000" last 30 days ,"r7776000" last 90 days
 
 KEYWORDS = [
