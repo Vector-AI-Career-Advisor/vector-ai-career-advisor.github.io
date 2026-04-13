@@ -1,11 +1,22 @@
 from __future__ import annotations
+import os
+import re
+import textwrap
 import psycopg2
 import psycopg2.extras
 from typing import Optional
 from langchain.tools import tool
+import anthropic
 
 from db import get_connection
 from db.chroma import init_chroma, search_jobs as chroma_search
+
+# ── User context ───────────────────────────────────────────────────────────
+# Set once at agent startup via set_current_user(); read by tools that need it.
+_context: dict = {"user_id": None}
+
+def set_current_user(user_id: int) -> None:
+    _context["user_id"] = user_id
 
 
 # ── helpers ───────────────────────────────────────────────────────────────
@@ -68,7 +79,7 @@ def get_job_details(job_ids: list[str]):
 
 
 @tool
-def get_job_aggregate(operation: str, column: str, role_filter: str = None):
+def get_job_aggregate(operation: str, column: str, role_filter: Optional[str] = None):
     """Calculate COUNT, AVG, MIN, or MAX statistics on job data.
     - operation: one of ['COUNT', 'AVG', 'MIN', 'MAX']
     - column: one of ['yearsexperience', 'posted_at']
@@ -123,10 +134,10 @@ def get_column_distribution(column: str, limit: int = 15):
 
 @tool
 def search_jobs_by_criteria(
-    role: str = None,
-    location: str = None,
-    company: str = None,
-    max_experience: int = None,
+    role: Optional[str] = None,
+    location: Optional[str] = None,
+    company: Optional[str] = None,
+    max_experience: Optional[int] = None,
 ):
     """Filter jobs by specific fields.
     - role: e.g. 'backend', 'react developer'
@@ -189,6 +200,137 @@ def top_skills_all(limit: int = 15):
     )
 
 
+@tool
+def tailor_resume_to_job(job_id: str) -> dict:
+    """Tailor the current user's resume to a specific job posting.
+    Rewords existing content to better match the job description using its keywords
+    and priorities. Never adds new skills, experiences, or credentials that are not
+    already in the resume. Saves the result as a PDF and returns the file path.
+    Use when the user asks to tailor or customise their resume for a job.
+    """
+    user_id = _context.get("user_id")
+    if not user_id:
+        return {"error": "No user session active. Cannot access resume."}
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Fetch resume
+            cur.execute(
+                "SELECT content FROM resumes WHERE user_id = %s",
+                (user_id,),
+            )
+            resume_row = cur.fetchone()
+            if not resume_row:
+                return {"error": "No resume on file. Please upload a PDF resume first."}
+
+            # Fetch job
+            cur.execute(
+                "SELECT title, company, description, skills_must, skills_nice FROM jobs WHERE id = %s",
+                (job_id,),
+            )
+            job_row = cur.fetchone()
+            if not job_row:
+                return {"error": f"Job '{job_id}' not found in the database."}
+    finally:
+        conn.close()
+
+    resume_text = resume_row["content"]
+    job_title   = job_row["title"] or ""
+    job_company = job_row["company"] or ""
+    job_desc    = job_row["description"] or ""
+    skills_must = ", ".join(job_row["skills_must"] or [])
+    skills_nice = ", ".join(job_row["skills_nice"] or [])
+
+    prompt = textwrap.dedent(f"""
+        You are a professional resume editor. Your task is to lightly tailor the
+        candidate's resume for a specific job posting.
+
+        STRICT RULES — you must follow all of them:
+        1. Do NOT add any new skills, tools, technologies, experiences, projects,
+           certifications, or credentials that are not already present in the resume.
+        2. Only rephrase, reorder, or reword existing content to better reflect the
+           language and priorities of the job description.
+        3. Keep every section present in the original. Do not remove sections.
+        4. Preserve all dates, company names, job titles, and education details exactly.
+        5. Output only the final tailored resume text — no commentary, no preamble.
+
+        ── JOB POSTING ──────────────────────────────────────────────────────
+        Title:    {job_title}
+        Company:  {job_company}
+        Required skills: {skills_must}
+        Nice-to-have:    {skills_nice}
+
+        Description:
+        {job_desc}
+
+        ── ORIGINAL RESUME ──────────────────────────────────────────────────
+        {resume_text}
+    """).strip()
+
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    tailored_text = message.content[0].text.strip()
+
+    # ── Save as PDF ───────────────────────────────────────────────────────
+    output_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "tailored_resumes",
+    )
+    os.makedirs(output_dir, exist_ok=True)
+
+    safe_job = re.sub(r"[^a-zA-Z0-9_-]", "_", job_id)[:40]
+    filename  = f"resume_user{user_id}_{safe_job}.pdf"
+    filepath  = os.path.join(output_dir, filename)
+
+    _save_pdf(tailored_text, filepath)
+
+    return {
+        "message":  "Tailored resume saved successfully.",
+        "file":     filepath,
+        "job_title": job_title,
+        "company":   job_company,
+    }
+
+
+def _save_pdf(text: str, filepath: str) -> None:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.enums import TA_LEFT
+
+    doc = SimpleDocTemplate(
+        filepath,
+        pagesize=A4,
+        leftMargin=22 * mm,
+        rightMargin=22 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
+    styles = getSampleStyleSheet()
+    body   = ParagraphStyle("body",   parent=styles["Normal"], fontSize=10, leading=14, alignment=TA_LEFT)
+    header = ParagraphStyle("header", parent=styles["Normal"], fontSize=12, leading=16, spaceAfter=2 * mm, fontName="Helvetica-Bold")
+
+    story = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            story.append(Spacer(1, 4 * mm))
+            continue
+        # Heuristic: all-caps short lines or lines ending with ":" are headings
+        is_heading = (stripped.isupper() and len(stripped) < 60) or (stripped.endswith(":") and len(stripped) < 50)
+        style = header if is_heading else body
+        story.append(Paragraph(stripped, style))
+        story.append(Spacer(1, 1 * mm))
+
+    doc.build(story)
+
+
 # ── exported list ─────────────────────────────────────────────────────────
 # This is the only thing agent.py needs to import
 
@@ -200,4 +342,5 @@ TOOLS = [
     search_jobs_by_criteria,
     top_skills,
     top_skills_all,
+    tailor_resume_to_job,
 ]

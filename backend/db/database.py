@@ -22,6 +22,17 @@ def init_db() -> None:
                 created_at TIMESTAMP DEFAULT NOW()
             );
         """)
+        # Resumes table (one per user)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS resumes (
+                id          SERIAL PRIMARY KEY,
+                user_id     INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                filename    TEXT NOT NULL,
+                content     TEXT NOT NULL,
+                uploaded_at TIMESTAMP DEFAULT NOW(),
+                updated_at  TIMESTAMP DEFAULT NOW()
+            );
+        """)
         # Jobs table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
