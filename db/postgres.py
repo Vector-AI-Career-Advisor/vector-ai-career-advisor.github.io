@@ -18,7 +18,7 @@ def get_connection():
 # ── Schema ────────────────────────────────────────────────────────────────────
 
 def init_db(conn) -> None:
-    """Create the jobs table if it does not exist."""
+    """Create the jobs table and supporting indexes if they do not exist."""
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
@@ -40,8 +40,49 @@ def init_db(conn) -> None:
                 scraped_at        TIMESTAMP DEFAULT NOW()
             );
         """)
+
+        # Indexes — created with IF NOT EXISTS so repeated calls are safe
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS jobs_scraped_date_idx
+                ON jobs ((scraped_at::date));
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS jobs_keyword_idx
+                ON jobs (keyword);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS jobs_role_idx
+                ON jobs (role);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS jobs_seniority_idx
+                ON jobs (seniority);
+        """)
+
     conn.commit()
-    log.info("DB schema ready.")
+    log.info("DB schema and indexes ready.")
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _to_date(val) -> Optional[date]:
+    """
+    Coerce a posted_at value to a Python date object (or None).
+    Accepts: date, datetime, ISO string 'YYYY-MM-DD', or None.
+    Passing a native date object avoids psycopg2's implicit string cast
+    which can silently produce wrong values on locale-sensitive servers.
+    """
+    if val is None:
+        return None
+    if isinstance(val, date):
+        return val
+    if isinstance(val, str):
+        try:
+            return date.fromisoformat(val[:10])
+        except ValueError:
+            log.warning("Could not parse posted_at value '%s' — storing NULL.", val)
+            return None
+    return None
 
 
 # ── Writes ────────────────────────────────────────────────────────────────────
@@ -59,7 +100,8 @@ def insert_jobs(conn, jobs: List[dict]) -> int:
             j.get("skills_must", []), j.get("skills_nice", []),
             j.get("yearsexperience"),
             j.get("past_experience", []),
-            j["keyword"], j.get("source", "linkedin"), j.get("posted_at"),
+            j["keyword"], j.get("source", "linkedin"),
+            _to_date(j.get("posted_at")),   # always a date object or None
         )
         for j in jobs
     ]
@@ -122,7 +164,7 @@ def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
 def fetch_jobs_missing_from_chroma(conn, chroma_job_ids: set) -> List[dict]:
     """
     Return jobs that exist in Postgres but are missing from ChromaDB.
-    Fetches only IDs first to avoid a full table scan.
+    Fetches only IDs first to avoid a full table scan with data transfer.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM jobs;")

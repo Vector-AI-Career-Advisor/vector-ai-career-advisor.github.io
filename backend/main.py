@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, jobs
+from routers import auth, jobs_stats_endpoint
 from db.database import init_db
 
 app = FastAPI(title="JobBoard API", version="1.0.0")
@@ -19,7 +19,7 @@ def on_startup():
     init_db()
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+app.include_router(jobs_stats_endpoint.router, prefix="/jobs", tags=["jobs"])
 
 @app.get("/")
 def root():

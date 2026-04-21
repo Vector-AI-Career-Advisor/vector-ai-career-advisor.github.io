@@ -17,7 +17,7 @@ from db.postgres import (
     init_db,
     insert_jobs,
 )
-from pipeline.extractor import extract_with_groq
+from pipeline.extractor import extract_all_parallel
 from pipeline.utils import fmt
 from scraper.scraper import build_driver, scrape_keyword
 
@@ -30,6 +30,8 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
     """
     Scrape LinkedIn for new jobs up to `daily_target` per day.
     Returns a list of raw stub dicts (with raw_description + posted_at).
+    Stubs where no description was fetched are filtered out here so that
+    downstream steps never waste an API call on empty content.
     """
     conn          = get_connection()
     init_db(conn)
@@ -55,11 +57,22 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
 
         try:
             for stub in scrape_keyword(driver, keyword, seen_ids, remaining - len(stubs)):
+                raw_desc = stub.get("raw_description", "")
+                if not raw_desc or raw_desc == "N/A":
+                    log.warning(
+                        "Dropping stub '%s' @ '%s' — no description fetched.",
+                        stub["title"], stub["company"],
+                    )
+                    continue
+
                 if stub.get("posted_at"):
-                    stub["posted_at"] = str(stub["posted_at"])
+                    stub["posted_at"] = stub["posted_at"]  # keep as date object; str() in insert
+
                 stubs.append(stub)
-                log.info("Scraped [%d/%d]: %s | %s", len(stubs), remaining,
-                         stub["title"], stub["company"])
+                log.info(
+                    "Scraped [%d/%d]: %s | %s",
+                    len(stubs), remaining, stub["title"], stub["company"],
+                )
 
         except (InvalidSessionIdException, WebDriverException) as e:
             log.warning("Browser crashed (%s) — rebuilding driver...", e)
@@ -78,7 +91,7 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
     except Exception:
         pass
 
-    log.info("Scrape complete — %d stubs collected.", len(stubs))
+    log.info("Scrape complete — %d stubs collected (descriptions present).", len(stubs))
     return stubs
 
 
@@ -86,41 +99,14 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
 
 def run_extract(stubs: List[dict]) -> List[dict]:
     """
-    Run Groq extraction on each stub.
+    Run Groq extraction on all stubs in parallel (one worker per API key).
     Returns a list of fully structured job dicts ready for storage.
     """
     if not stubs:
         log.info("No stubs to extract.")
         return []
 
-    jobs = []
-    for i, stub in enumerate(stubs, start=1):
-        log.info("[%d/%d] Extracting: %s | %s", i, len(stubs), stub["title"], stub["company"])
-        extracted = extract_with_groq(stub["title"], stub["raw_description"])
-
-        job = {
-            "id":              stub["id"],
-            "title":           stub["title"],
-            "company":         stub["company"],
-            "location":        stub["location"],
-            "url":             stub["url"],
-            "role":            extracted["role"],
-            "seniority":       extracted["seniority"],
-            "description":     extracted["description"],
-            "skills_must":     extracted["skills_must"],
-            "skills_nice":     extracted["skills_nice"],
-            "yearsexperience": extracted["yearsexperience"],
-            "past_experience": extracted["past_experience"],
-            "posted_at":       stub.get("posted_at"),
-            "keyword":         stub["keyword"],
-            "source":          "linkedin",
-        }
-        jobs.append(job)
-        log.info("  ✓ %s | %s | exp: %s", job["role"], job["seniority"],
-                 f"{job['yearsexperience']}yr" if job["yearsexperience"] else "?")
-
-    log.info("Extraction complete — %d jobs processed.", len(jobs))
-    return jobs
+    return extract_all_parallel(stubs)
 
 
 # ── Step 3a: Load PostgreSQL ──────────────────────────────────────────────────
@@ -145,11 +131,11 @@ def run_load_chroma() -> int:
     Backfill ChromaDB with any jobs that exist in PostgreSQL but are missing
     from the vector store. Returns number of vectors upserted.
     """
-    collection    = init_chroma()
-    conn          = get_connection()
-    raw_ids       = get_existing_ids(collection)
+    collection     = init_chroma()
+    conn           = get_connection()
+    raw_ids        = get_existing_ids(collection)
     chroma_job_ids = {vid.rsplit("_", 1)[0] for vid in raw_ids}
-    missing       = fetch_jobs_missing_from_chroma(conn, chroma_job_ids)
+    missing        = fetch_jobs_missing_from_chroma(conn, chroma_job_ids)
     conn.close()
 
     if not missing:

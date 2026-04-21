@@ -1,16 +1,23 @@
+// src/pages/JobsPage.tsx  (full replacement)
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchJobs, Job } from '../api/jobs'
 import { useAuth } from '../hooks/useAuth'
 import JobCard from '../components/JobCard'
 import JobDrawer from '../components/JobDrawer'
 import AgentChat from '../components/AgentChat'
+import StatsPage from './StatsPage'
 import './JobsPage.css'
 
 const SENIORITIES = ['', 'Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
 const LIMIT = 50
 
+type Tab = 'jobs' | 'stats'
+
 export default function JobsPage() {
   const { handleLogout } = useAuth()
+  const [activeTab, setActiveTab] = useState<Tab>('jobs')
+
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -113,132 +120,165 @@ export default function JobsPage() {
           <span className="logo-icon">◈</span>
           <span className="logo-text">Vector</span>
         </div>
+
+        {/* ── Tab switcher ── */}
+        <div className="nav-tabs">
+          <button
+            className={`nav-tab ${activeTab === 'jobs' ? 'active' : ''}`}
+            onClick={() => setActiveTab('jobs')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            Jobs
+          </button>
+          <button
+            className={`nav-tab ${activeTab === 'stats' ? 'active' : ''}`}
+            onClick={() => setActiveTab('stats')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6"  y1="20" x2="6"  y2="14"/>
+            </svg>
+            Statistics
+          </button>
+        </div>
+
         <div className="navbar-right">
-          <span className="jobs-count">{total} listings</span>
+          {activeTab === 'jobs' && (
+            <span className="jobs-count">{total} listings</span>
+          )}
           <button className="btn-logout" onClick={handleLogout}>Sign out</button>
         </div>
       </nav>
 
-      {/* ── Two-column master layout ── */}
-      <div className="page-columns">
+      {/* ── Statistics view (full-width) ── */}
+      {activeTab === 'stats' && (
+        <div className="stats-view">
+          <StatsPage />
+        </div>
+      )}
 
-        {/* LEFT: filters + job list */}
-        <div className="left-column">
-          <div className="jobs-layout">
-            <aside className="jobs-sidebar">
-              <div className="sidebar-header">
-                <h3>Filters</h3>
-                {hasFilters && (
-                  <button className="clear-filters" onClick={clearFilters}>Clear all</button>
-                )}
-              </div>
+      {/* ── Jobs view (two-column) ── */}
+      {activeTab === 'jobs' && (
+        <div className="page-columns">
 
-              <div className="filter-group">
-                <label className="filter-label">Search</label>
-                <div className="search-input-wrap">
-                  <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                  </svg>
+          {/* LEFT: filters + job list */}
+          <div className="left-column">
+            <div className="jobs-layout">
+              <aside className="jobs-sidebar">
+                <div className="sidebar-header">
+                  <h3>Filters</h3>
+                  {hasFilters && (
+                    <button className="clear-filters" onClick={clearFilters}>Clear all</button>
+                  )}
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Search</label>
+                  <div className="search-input-wrap">
+                    <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Role, keyword…"
+                      value={keyword}
+                      onChange={e => setKeyword(e.target.value)}
+                      className="filter-input with-icon"
+                    />
+                  </div>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Location</label>
                   <input
                     type="text"
-                    placeholder="Role, keyword…"
-                    value={keyword}
-                    onChange={e => setKeyword(e.target.value)}
-                    className="filter-input with-icon"
+                    placeholder="City or remote…"
+                    value={location}
+                    onChange={e => setLocation(e.target.value)}
+                    className="filter-input"
                   />
                 </div>
-              </div>
 
-              <div className="filter-group">
-                <label className="filter-label">Location</label>
-                <input
-                  type="text"
-                  placeholder="City or remote…"
-                  value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  className="filter-input"
-                />
-              </div>
-
-              <div className="filter-group">
-                <label className="filter-label">Seniority</label>
-                <div className="seniority-chips">
-                  {SENIORITIES.map(s => (
-                    <button
-                      key={s}
-                      className={`chip ${seniority === s ? 'active' : ''}`}
-                      onClick={() => setSeniority(s)}
-                    >
-                      {s || 'All'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </aside>
-
-            <main className="jobs-main">
-              {loading ? (
-                <div className="jobs-loading">
-                  <div className="spinner" />
-                  <p>Loading jobs…</p>
-                </div>
-              ) : error ? (
-                <div className="jobs-error">
-                  <p>{error}</p>
-                  <button className="btn-retry" onClick={load}>Retry</button>
-                </div>
-              ) : jobs.length === 0 ? (
-                <div className="jobs-empty">
-                  <div className="empty-icon">◈</div>
-                  <h3>No jobs found</h3>
-                  <p>Try adjusting your filters.</p>
-                  {hasFilters && (
-                    <button className="btn-retry" onClick={clearFilters}>Clear filters</button>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="jobs-grid">
-                    {jobs.map((job, i) => (
-                      <div
-                        key={job.id}
-                        style={{ animationDelay: `${Math.min(i * 30, 400)}ms` }}
-                        className="card-wrapper"
+                <div className="filter-group">
+                  <label className="filter-label">Seniority</label>
+                  <div className="seniority-chips">
+                    {SENIORITIES.map(s => (
+                      <button
+                        key={s}
+                        className={`chip ${seniority === s ? 'active' : ''}`}
+                        onClick={() => setSeniority(s)}
                       >
-                        <JobCard job={job} onClick={() => setSelected(job)} />
-                      </div>
+                        {s || 'All'}
+                      </button>
                     ))}
                   </div>
-                  <div ref={sentinelRef} style={{ height: 1 }} />
-                  {loadingMore && (
-                    <div className="jobs-loading-more">
-                      <div className="spinner spinner-sm" />
-                      <p>Loading more…</p>
+                </div>
+              </aside>
+
+              <main className="jobs-main">
+                {loading ? (
+                  <div className="jobs-loading">
+                    <div className="spinner" />
+                    <p>Loading jobs…</p>
+                  </div>
+                ) : error ? (
+                  <div className="jobs-error">
+                    <p>{error}</p>
+                    <button className="btn-retry" onClick={load}>Retry</button>
+                  </div>
+                ) : jobs.length === 0 ? (
+                  <div className="jobs-empty">
+                    <div className="empty-icon">◈</div>
+                    <h3>No jobs found</h3>
+                    <p>Try adjusting your filters.</p>
+                    {hasFilters && (
+                      <button className="btn-retry" onClick={clearFilters}>Clear filters</button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="jobs-grid">
+                      {jobs.map((job, i) => (
+                        <div
+                          key={job.id}
+                          style={{ animationDelay: `${Math.min(i * 30, 400)}ms` }}
+                          className="card-wrapper"
+                        >
+                          <JobCard job={job} onClick={() => setSelected(job)} />
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  {!hasMore && jobs.length > 0 && (
-                    <p className="jobs-end-message">You've seen all {total} listings</p>
-                  )}
-                </>
-              )}
-            </main>
+                    <div ref={sentinelRef} style={{ height: 1 }} />
+                    {loadingMore && (
+                      <div className="jobs-loading-more">
+                        <div className="spinner spinner-sm" />
+                        <p>Loading more…</p>
+                      </div>
+                    )}
+                    {!hasMore && jobs.length > 0 && (
+                      <p className="jobs-end-message">You've seen all {total} listings</p>
+                    )}
+                  </>
+                )}
+              </main>
+            </div>
+          </div>
+
+          {/* RIGHT: agent chat panel */}
+          <div className="right-column">
+            <AgentChat selectedJob={selected} jobs={jobs} />
           </div>
         </div>
-
-        {/* RIGHT: agent chat panel */}
-        <div className="right-column">
-          {/*
-            AgentChat receives:
-              - selectedJob: the job the user currently has open (or null)
-              - jobs: full list for context if your agent needs it
-
-            When your real agent is ready, swap the internals of AgentChat.tsx
-            — this component's API surface won't need to change.
-          */}
-          <AgentChat selectedJob={selected} jobs={jobs} />
-        </div>
-      </div>
+      )}
 
       <JobDrawer job={selected} onClose={() => setSelected(null)} />
     </div>
