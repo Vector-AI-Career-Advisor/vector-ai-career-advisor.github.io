@@ -1,8 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# ADD THIS ROUTE to your existing jobs.py, BEFORE the `/{job_id}` route.
-# The /stats path must be registered before /{job_id} so FastAPI doesn't
-# treat the literal string "stats" as a job id.
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, Query
@@ -154,9 +150,7 @@ def get_stats(user_id: str = Depends(get_current_user)):
         conn.close()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Keep your existing list_jobs and get_job routes below this one.
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/")
 def list_jobs(
@@ -190,7 +184,7 @@ def list_jobs(
                 SELECT COUNT(*) OVER() AS total_count,
                        id, title, role, seniority, company, location, url,
                        description, skills_must, skills_nice, yearsexperience,
-                       past_experience, keyword, source, posted_at, scraped_at
+                       past_experience, keyword, source, posted_at, scraped_at,logo_url
                 FROM jobs
                 {where}
                 ORDER BY scraped_at DESC
@@ -223,7 +217,7 @@ def get_job(job_id: str, user_id: str = Depends(get_current_user)):
             cur.execute("""
                 SELECT id, title, role, seniority, company, location, url,
                        description, skills_must, skills_nice, yearsexperience,
-                       past_experience, keyword, source, posted_at, scraped_at
+                       past_experience, keyword, source, posted_at, scraped_at,logo_url
                 FROM jobs WHERE id = %s
             """, (job_id,))
             row = cur.fetchone()

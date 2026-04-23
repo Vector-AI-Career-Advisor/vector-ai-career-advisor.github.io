@@ -1,11 +1,14 @@
 .job-card {
+  height: 200px;
+  width: 500px;
   display: flex;
   align-items: flex-start;
   gap: 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.25rem 1.4rem;
+  padding: 1.25rem 1.4rem 1.8rem;
+  padding-bottom: 15rem;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -29,7 +32,6 @@
 
 .job-card:hover::before { opacity: 1; }
 
-/* Avatar */
 .job-avatar {
   flex-shrink: 0;
   width: 44px;

@@ -17,6 +17,7 @@ export interface Job {
   source?: string
   posted_at?: string
   scraped_at?: string
+  
 }
 
 export interface JobFilters {

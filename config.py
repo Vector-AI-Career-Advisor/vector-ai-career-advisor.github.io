@@ -26,7 +26,7 @@ CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
 
 
 # ───────── Scraper ─────────
-DAILY_TARGET = 10
+DAILY_TARGET = 50
 CHROME_VERSION = 145
 DATE_FILTER = "r604800" #"r86400" last 24 hours,"r604800"last 7 days,"r2592000" last 30 days ,"r7776000" last 90 days
 

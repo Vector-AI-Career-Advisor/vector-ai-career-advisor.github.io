@@ -41,6 +41,11 @@ def init_db(conn) -> None:
             );
         """)
 
+        # Add logo_url to existing tables that were created before this migration
+        cur.execute("""
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS logo_url TEXT;
+        """)
+
         # Indexes — created with IF NOT EXISTS so repeated calls are safe
         cur.execute("""
             CREATE INDEX IF NOT EXISTS jobs_scraped_date_idx
@@ -69,8 +74,6 @@ def _to_date(val) -> Optional[date]:
     """
     Coerce a posted_at value to a Python date object (or None).
     Accepts: date, datetime, ISO string 'YYYY-MM-DD', or None.
-    Passing a native date object avoids psycopg2's implicit string cast
-    which can silently produce wrong values on locale-sensitive servers.
     """
     if val is None:
         return None
@@ -101,7 +104,8 @@ def insert_jobs(conn, jobs: List[dict]) -> int:
             j.get("yearsexperience"),
             j.get("past_experience", []),
             j["keyword"], j.get("source", "linkedin"),
-            _to_date(j.get("posted_at")),   # always a date object or None
+            _to_date(j.get("posted_at")),
+            j.get("logo_url"),
         )
         for j in jobs
     ]
@@ -111,10 +115,12 @@ def insert_jobs(conn, jobs: List[dict]) -> int:
             INSERT INTO jobs (
                 id, title, role, seniority, company, location, url,
                 description, skills_must, skills_nice, yearsexperience,
-                past_experience, keyword, source, posted_at
+                past_experience, keyword, source, posted_at, logo_url
             )
             VALUES %s
-            ON CONFLICT (id) DO NOTHING;
+            ON CONFLICT (id) DO UPDATE SET
+                logo_url = EXCLUDED.logo_url
+                WHERE jobs.logo_url IS NULL AND EXCLUDED.logo_url IS NOT NULL;
         """, rows)
     conn.commit()
     log.info("Inserted %d jobs into PostgreSQL.", len(rows))
@@ -153,7 +159,7 @@ def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
         cur.execute("""
             SELECT id, title, role, seniority, company, location, url,
                    description, skills_must, skills_nice, yearsexperience,
-                   past_experience, keyword, source, posted_at
+                   past_experience, keyword, source, posted_at, logo_url
             FROM jobs
             WHERE id = ANY(%s);
         """, (ids,))
@@ -164,7 +170,6 @@ def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
 def fetch_jobs_missing_from_chroma(conn, chroma_job_ids: set) -> List[dict]:
     """
     Return jobs that exist in Postgres but are missing from ChromaDB.
-    Fetches only IDs first to avoid a full table scan with data transfer.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM jobs;")
@@ -173,5 +178,3 @@ def fetch_jobs_missing_from_chroma(conn, chroma_job_ids: set) -> List[dict]:
     missing_ids = [jid for jid in all_ids if jid not in chroma_job_ids]
     log.info("%d jobs missing from ChromaDB — backfilling.", len(missing_ids))
     return fetch_jobs_by_ids(conn, missing_ids)
-
-    
