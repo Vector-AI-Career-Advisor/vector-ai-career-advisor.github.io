@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, jobs, resumes, agent_chat
+from routers import auth, resumes, agent_chat
+from routers import jobs_stats_endpoint as jobs
 from db.database import init_db
 
 app = FastAPI(title="JobBoard API", version="1.0.0")

@@ -17,7 +17,7 @@ export interface Job {
   source?: string
   posted_at?: string
   scraped_at?: string
-  
+  logo_url?: string
 }
 
 export interface JobFilters {

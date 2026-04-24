@@ -54,6 +54,9 @@ def init_db() -> None:
                 scraped_at       TIMESTAMP DEFAULT NOW()
             );
         """)
+        cur.execute("""
+            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS logo_url TEXT;
+        """)
     conn.commit()
     conn.close()
     log.info("DB schema ready.")
