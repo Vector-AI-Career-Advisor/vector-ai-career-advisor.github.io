@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import logging
 from typing import Dict, List, Optional
@@ -20,6 +19,9 @@ FIELD_VECTORS = [
     "company",
     "location",
 ]
+
+# Maximum vectors per ChromaDB upsert call — keeps memory bounded on large runs
+_UPSERT_BATCH_SIZE = 500
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────
@@ -69,53 +71,78 @@ def _field_text(job: dict, field: str) -> str:
     return str(val).strip() if val else ""
 
 
+def _chroma_upsert_batch(
+    collection: chromadb.Collection,
+    ids: List[str],
+    documents: List[str],
+    embeddings: List[List[float]],
+    metadatas: List[dict],
+) -> None:
+    """Upsert in chunks to stay within ChromaDB's recommended batch size."""
+    for start in range(0, len(ids), _UPSERT_BATCH_SIZE):
+        end = start + _UPSERT_BATCH_SIZE
+        collection.upsert(
+            ids=ids[start:end],
+            documents=documents[start:end],
+            embeddings=embeddings[start:end],
+            metadatas=metadatas[start:end],
+        )
+
+
 # ── Writes ────────────────────────────────────────────────────────────────────
 
 def upsert_jobs(collection: chromadb.Collection, jobs: List[dict]) -> int:
     """
     Upsert jobs into ChromaDB.
+
     Each job produces:
       - 1 full-text vector
       - 1 vector per FIELD_VECTORS field (if the field has content)
+
+    All texts across ALL jobs are embedded in a single batch call,
+    then upserted to ChromaDB in one chunked call — minimising both
+    embedding latency and ChromaDB round-trips.
+
     Returns total number of vectors upserted.
     """
     if not jobs:
         return 0
 
-    total = 0
+    # ── Build all texts and record structure ──────────────────────────────────
+    # plan: list of (vector_id, text, metadata) tuples, in order
+    plan: list[tuple[str, str, dict]] = []
 
     for job in jobs:
         job_id = job["id"]
         meta   = build_chroma_metadata(job)
 
-        # Build all texts for this job at once
-        full_text   = _build_full_text(job)
-        field_texts = {f: _field_text(job, f) for f in FIELD_VECTORS}
-        non_empty   = {f: t for f, t in field_texts.items() if t}
-
-        # One batch embedding call per job
-        all_texts = [full_text] + list(non_empty.values())
-        all_vecs  = get_embeddings(all_texts)
-
         # Full-text vector
-        collection.upsert(
-            ids=[f"{job_id}_full"],
-            documents=[full_text],
-            embeddings=[all_vecs[0]],
-            metadatas=[{"job_id": job_id, "type": "full", **meta}],
-        )
-        total += 1
+        full_text = _build_full_text(job)
+        plan.append((f"{job_id}_full", full_text, {"job_id": job_id, "type": "full", **meta}))
 
-        # Per-field vectors
-        for i, (field, text) in enumerate(non_empty.items(), start=1):
-            collection.upsert(
-                ids=[f"{job_id}_{field}"],
-                documents=[text],
-                embeddings=[all_vecs[i]],
-                metadatas=[{"job_id": job_id, "type": "field", "field": field, **meta}],
-            )
-            total += 1
+        # Per-field vectors (only for non-empty fields)
+        for field in FIELD_VECTORS:
+            text = _field_text(job, field)
+            if text:
+                plan.append((
+                    f"{job_id}_{field}",
+                    text,
+                    {"job_id": job_id, "type": "field", "field": field, **meta},
+                ))
 
+    # ── Single batch embedding call for ALL texts ─────────────────────────────
+    all_texts = [text for _, text, _ in plan]
+    log.info("Embedding %d texts for %d jobs in one batch call...", len(all_texts), len(jobs))
+    all_vecs = get_embeddings(all_texts)
+
+    # ── Single batched upsert ─────────────────────────────────────────────────
+    ids       = [vec_id  for vec_id, _, _  in plan]
+    documents = [text    for _, text, _    in plan]
+    metadatas = [meta    for _, _, meta    in plan]
+
+    _chroma_upsert_batch(collection, ids, documents, all_vecs, metadatas)
+
+    total = len(plan)
     log.info("Upserted %d vectors for %d jobs.", total, len(jobs))
     return total
 

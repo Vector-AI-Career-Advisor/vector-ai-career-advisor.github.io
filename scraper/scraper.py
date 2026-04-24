@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import re
 import time
 
@@ -11,12 +12,14 @@ from selenium.common.exceptions import InvalidSessionIdException, WebDriverExcep
 from config import CHROME_VERSION, DATE_FILTER
 from pipeline.utils import parse_posted_date, fmt
 
+log = logging.getLogger(__name__)
+
 
 # ── driver ────────────────────────────────────────────────────────────────
 
 def build_driver() -> uc.Chrome:
     options = uc.ChromeOptions()
-    options.add_argument("--headless=new") 
+    options.add_argument("--headless=new")
     options.add_argument("--start-maximized")
     options.add_argument("--lang=he-IL")
     options.add_argument("--accept-lang=he-IL,he;q=0.9,en-US;q=0.8")
@@ -26,10 +29,11 @@ def build_driver() -> uc.Chrome:
     options.add_argument("--disable-web-security")
     options.add_argument("--disable-features=IsolateOrigins,site-per-process")
 
-    driver = uc.Chrome(options=options, use_subprocess=True, version_main=CHROME_VERSION)
+    driver = uc.Chrome(options=options, use_subprocess=True)
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {
         "headers": {"Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8"}
     })
+    log.info("Chrome driver initialised.")
     return driver
 
 
@@ -145,7 +149,7 @@ def fetch_stubs(driver, seen_ids: set) -> list:
 
             if not job_id or job_id in seen_ids:
                 if job_id in seen_ids:
-                    print(f"  Dup: {title}")
+                    log.debug("Duplicate card skipped: %s", title)
                 continue
 
             try:
@@ -177,7 +181,6 @@ def fetch_stubs(driver, seen_ids: set) -> list:
 def get_description(driver, job_id: str) -> tuple[str, object, float]:
     """
     Fetch the full job description from the LinkedIn API page.
-
     Returns (description_text, posted_at_date, elapsed_seconds).
     """
     t0          = time.time()
@@ -187,13 +190,15 @@ def get_description(driver, job_id: str) -> tuple[str, object, float]:
         try:
             driver.get(api_url(job_id))
 
-            # Check for auth walls
             authwall_start = time.time()
             while time.time() - authwall_start < 3:
                 url = driver.current_url
                 if "authwall" in url or "login" in url or "checkpoint" in url:
                     wait_secs = 20 + (attempt * 10)
-                    print(f"  Auth wall — waiting {wait_secs}s (retry {attempt+1}/{MAX_RETRIES})...")
+                    log.warning(
+                        "Auth wall detected — waiting %ds (retry %d/%d)...",
+                        wait_secs, attempt + 1, MAX_RETRIES,
+                    )
                     time.sleep(wait_secs)
                     break
                 time.sleep(0.3)
@@ -218,7 +223,6 @@ def get_description(driver, job_id: str) -> tuple[str, object, float]:
                 except Exception:
                     continue
 
-            # Parse posted date
             try:
                 time_el = driver.find_element(
                     By.CSS_SELECTOR, "time.posted-time-ago__text, time[datetime]"
@@ -244,8 +248,9 @@ def get_description(driver, job_id: str) -> tuple[str, object, float]:
             if description != "N/A":
                 return description, posted_at, time.time() - t0
 
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("get_description attempt %d/%d failed for job %s: %s",
+                      attempt + 1, MAX_RETRIES, job_id, e)
 
     return "N/A", None, time.time() - t0
 
@@ -254,18 +259,18 @@ def get_description(driver, job_id: str) -> tuple[str, object, float]:
 
 def scrape_keyword(driver, keyword: str, seen_ids: set, remaining: int = 50):
     """
-    Generator: yields one job dict at a time (with raw_description + posted_at).
+    Generator: yields one job stub at a time (with raw_description + posted_at).
     Each job is yielded immediately after its description is fetched so the
     caller can extract + insert without waiting for the whole keyword to finish.
     """
     kw_start = time.time()
-    print(f"\n── Keyword: '{keyword}' ──────────────────────────────")
+    log.info("── Keyword: '%s' ──────────────────────────────", keyword)
 
     driver.get(search_url(keyword))
     dismiss_popup(driver)
 
     if not wait_for_cards(driver):
-        print("  No cards found.")
+        log.info("No cards found for keyword '%s'.", keyword)
         return
 
     scroll_to_load_all(driver)
@@ -280,7 +285,8 @@ def scrape_keyword(driver, keyword: str, seen_ids: set, remaining: int = 50):
         page_count = len(page_stubs)
         new_stubs  = [s for s in page_stubs if s["id"] not in {x["id"] for x in all_stubs}]
         all_stubs.extend(new_stubs)
-        print(f"  Page {page+1}: {page_count} cards, {len(new_stubs)} new (total: {len(all_stubs)})")
+        log.info("Page %d: %d cards, %d new (total: %d)",
+                 page + 1, page_count, len(new_stubs), len(all_stubs))
 
         if page_count == 0:
             break
@@ -298,11 +304,11 @@ def scrape_keyword(driver, keyword: str, seen_ids: set, remaining: int = 50):
             break
 
     if not all_stubs:
-        print("  No new cards.")
+        log.info("No new cards for keyword '%s'.", keyword)
         return
 
     all_stubs = all_stubs[:remaining]
-    print(f"  Fetching descriptions for {len(all_stubs)} jobs...")
+    log.info("Fetching descriptions for %d jobs (keyword: '%s')...", len(all_stubs), keyword)
 
     job_times = []
 
@@ -314,18 +320,19 @@ def scrape_keyword(driver, keyword: str, seen_ids: set, remaining: int = 50):
             raw_desc, posted_at, elapsed = get_description(driver, stub["id"])
             job_times.append(elapsed)
             seen_ids.add(stub["id"])
-            print(f"  [fetch] {stub['title']} | {stub['company']} | {fmt(elapsed)}")
+            log.info("[fetch] %s | %s | %s", stub["title"], stub["company"], fmt(elapsed))
         except (InvalidSessionIdException, WebDriverException):
             raise
         except Exception as e:
-            print(f"  [fetch error] {stub['id']}: {e}")
+            log.warning("[fetch error] job_id=%s: %s", stub["id"], e)
             continue
 
         stub["raw_description"] = raw_desc
         stub["posted_at"]       = posted_at
         stub["keyword"]         = keyword
 
-        yield stub  
+        yield stub
 
     avg = sum(job_times) / len(job_times) if job_times else 0
-    print(f"  ✓ {fmt(time.time() - kw_start)} | {len(job_times)} fetched | avg: {fmt(avg)}/job")
+    log.info("Keyword '%s' done in %s | %d fetched | avg: %s/job",
+             keyword, fmt(time.time() - kw_start), len(job_times), fmt(avg))

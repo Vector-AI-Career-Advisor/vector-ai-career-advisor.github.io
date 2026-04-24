@@ -54,7 +54,7 @@ def _read_json(path: str):
 def task_scrape(**context):
     from pipeline.core import run_scrape
 
-    stubs      = run_scrape()
+    stubs= run_scrape()
     stubs_file = _run_file(context, "stubs")
     _write_json(stubs_file, stubs)
     context["ti"].xcom_push(key="stubs_file", value=stubs_file)
@@ -65,8 +65,8 @@ def task_extract(**context):
     from pipeline.core import run_extract
 
     stubs_file = context["ti"].xcom_pull(key="stubs_file", task_ids="scrape")
-    stubs      = _read_json(stubs_file)
-    jobs       = run_extract(stubs)
+    stubs= _read_json(stubs_file)
+    jobs = run_extract(stubs)
     jobs_file  = _run_file(context, "jobs")
     _write_json(jobs_file, jobs)
     context["ti"].xcom_push(key="jobs_file", value=jobs_file)
@@ -77,7 +77,7 @@ def task_load_postgres(**context):
     from pipeline.core import run_load_postgres
 
     jobs_file = context["ti"].xcom_pull(key="jobs_file", task_ids="extract")
-    jobs      = _read_json(jobs_file)
+    jobs= _read_json(jobs_file)
     inserted  = run_load_postgres(jobs)
     log.info("PostgreSQL: %d jobs inserted.", inserted)
 
