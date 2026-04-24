@@ -31,9 +31,8 @@ from typing import Optional
 from groq import APIConnectionError, Groq, RateLimitError
 from config import (
     EXTRACTION_PROMPT,
-    GROQ_API_KEY_CHAT,
-    GROQ_API_KEY_EXTRACT,
-    GROQ_MODEL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
     VALID_ROLES,
     VALID_SENIORITY,
 )
@@ -402,12 +401,12 @@ def _empty_extraction() -> dict:
 
 
 def _validate(data: dict, title: str) -> dict:
-    """Validate and normalise a raw Groq extraction dict."""
+    """Validate and normalise a raw Claude extraction dict."""
     empty  = _empty_extraction()
     result = {}
 
     for key, default in empty.items():
-        # Groq sometimes returns "experience" instead of "yearsexperience"
+        # LLM sometimes returns "experience" instead of "yearsexperience"
         llm_key = "experience" if key == "yearsexperience" else key
         val     = data.get(llm_key, data.get(key, default))
 

@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { Job } from '../api/jobs'
+import { uploadResume, getMyResume } from '../api/resumes'
+import api from '../api/client'
 import './AgentChat.css'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Role = 'user' | 'agent'
+type Role = 'user' | 'agent' | 'system'
 
 interface Message {
   id: string
@@ -18,46 +20,22 @@ interface Props {
   jobs?: Job[]
 }
 
-// ─── Stub: replace this function with your real agent call ──────────────────
-//
-// HOW TO WIRE YOUR AGENT LATER:
-//
-// 1. Replace the body of `callAgent` with your actual API call, e.g.:
-//
-//      const res = await fetch('/api/agent/chat', {
-//        method: 'POST',
-//        headers: { 'Content-Type': 'application/json' },
-//        body: JSON.stringify({
-//          message,
-//          job_context: selectedJob,   // pass the open job for context
-//          history: messages,           // pass history if your agent is stateless
-//        }),
-//      })
-//      const data = await res.json()
-//      return data.reply
-//
-// 2. If your agent streams tokens, change `setMessages` to append character
-//    by character using a ReadableStream reader instead of resolving once.
-//
-// 3. The component already handles loading state (isTyping) and error display.
-//    Just throw from callAgent and the catch block will surface it.
-
 async function callAgent(
   message: string,
   selectedJob: Job | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _history: Message[]
+  history: Message[]
 ): Promise<string> {
-  // Stub: simulates a short network delay then echoes back
-  await new Promise(r => setTimeout(r, 900))
-
-  if (selectedJob) {
-    return `I can see you're looking at the **${selectedJob.title}** role at ${selectedJob.company}. Your real agent will answer here — replace \`callAgent\` in AgentChat.tsx with your API call.`
-  }
-  return `Got your message: "${message}". Your real agent will answer here — replace \`callAgent\` in AgentChat.tsx with your API call.`
+  const { data } = await api.post('/agent/chat', {
+    message,
+    job_id: selectedJob?.id ?? null,
+    history: history
+      .filter(m => m.role === 'user' || m.role === 'agent')
+      .map(m => ({ role: m.role, text: m.text })),
+  })
+  return data.reply
 }
 
-// ─── Suggested prompts shown when chat is empty ──────────────────────────────
+// ─── Suggested prompts ───────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   'What skills do I need for this role?',
@@ -69,12 +47,23 @@ const SUGGESTIONS = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AgentChat({ selectedJob, jobs = [] }: Props) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [messages, setMessages]         = useState<Message[]>([])
+  const [input, setInput]               = useState('')
+  const [isTyping, setIsTyping]         = useState(false)
+  const [error, setError]               = useState<string | null>(null)
+  const [resumeFilename, setResumeFilename] = useState<string | null>(null)
+  const [uploadState, setUploadState]   = useState<'idle' | 'uploading' | 'error'>('idle')
+
+  const bottomRef  = useRef<HTMLDivElement>(null)
+  const inputRef   = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch existing resume on mount
+  useEffect(() => {
+    getMyResume()
+      .then(info => { if (info) setResumeFilename(info.filename) })
+      .catch(() => {})
+  }, [])
 
   // Scroll to latest message
   useEffect(() => {
@@ -138,6 +127,31 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     }
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    setUploadState('uploading')
+    try {
+      await uploadResume(file)
+      setResumeFilename(file.name)
+      setUploadState('idle')
+      setMessages(prev => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'system',
+          text: `Resume "${file.name}" uploaded successfully.`,
+          timestamp: new Date(),
+        },
+      ])
+    } catch {
+      setUploadState('error')
+      setTimeout(() => setUploadState('idle'), 3000)
+    }
+  }
+
   const isEmpty = messages.length === 0
 
   return (
@@ -154,21 +168,31 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
         </div>
         <div>
           <p className="agent-name">Career Agent</p>
-          <p className="agent-status">
-            {isTyping ? 'Typing…' : 'Online'}
-          </p>
+          <p className="agent-status">{isTyping ? 'Typing…' : 'Online'}</p>
         </div>
-        {selectedJob && (
-          <div className="agent-context-pill">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <rect x="2" y="7" width="20" height="14" rx="2"/>
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-            </svg>
-            {selectedJob.title}
-          </div>
-        )}
+
+        <div className="agent-header-pills">
+          {selectedJob && (
+            <div className="agent-context-pill">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <rect x="2" y="7" width="20" height="14" rx="2"/>
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+              </svg>
+              {selectedJob.title}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
 
       {/* Message area */}
       <div className="agent-messages">
@@ -182,11 +206,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
             </p>
             <div className="agent-suggestions">
               {SUGGESTIONS.map(s => (
-                <button
-                  key={s}
-                  className="suggestion-chip"
-                  onClick={() => send(s)}
-                >
+                <button key={s} className="suggestion-chip" onClick={() => send(s)}>
                   {s}
                 </button>
               ))}
@@ -196,23 +216,26 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
           <>
             {messages.map(msg => (
               <div key={msg.id} className={`message-row ${msg.role}`}>
-                <div className={`bubble ${msg.role}`}>
-                  {/* Minimal markdown: bold only */}
-                  <span
-                    dangerouslySetInnerHTML={{
-                      __html: msg.text
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
-                    }}
-                  />
-                  <span className="msg-time">
-                    {msg.timestamp.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
+                {msg.role === 'system' ? (
+                  <div className="system-message">{msg.text}</div>
+                ) : (
+                  <div className={`bubble ${msg.role}`}>
+                    <span
+                      dangerouslySetInnerHTML={{
+                        __html: msg.text
+                          .replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
+                      }}
+                    />
+                    <span className="msg-time">
+                      {msg.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -224,9 +247,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
               </div>
             )}
 
-            {error && (
-              <div className="agent-error">{error}</div>
-            )}
+            {error && <div className="agent-error">{error}</div>}
           </>
         )}
         <div ref={bottomRef} />
@@ -234,6 +255,32 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
 
       {/* Input bar */}
       <div className="agent-input-bar">
+        {/* Resume upload button */}
+        <button
+          className={`agent-icon-btn agent-resume-btn ${resumeFilename ? 'has-resume' : ''}`}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadState === 'uploading'}
+          title={
+            uploadState === 'uploading' ? 'Uploading…' :
+            uploadState === 'error'     ? 'Upload failed — try again' :
+            resumeFilename              ? `Resume: ${resumeFilename}\nClick to replace` :
+                                          'Upload resume (PDF)'
+          }
+          aria-label="Upload resume"
+        >
+          {uploadState === 'uploading' ? (
+            <span className="upload-spinner" />
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          )}
+        </button>
+
         <textarea
           ref={inputRef}
           className="agent-input"
@@ -245,12 +292,12 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
           disabled={isTyping}
         />
         <button
-          className="agent-send"
+          className="agent-icon-btn agent-send"
           onClick={() => send(input)}
           disabled={!input.trim() || isTyping}
           aria-label="Send"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
           </svg>
