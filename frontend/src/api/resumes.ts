@@ -23,3 +23,7 @@ export const getMyResume = async (): Promise<ResumeInfo | null> => {
     throw e
   }
 }
+
+export const deleteResume = async (): Promise<void> => {
+  await api.delete('/resumes/me')
+}

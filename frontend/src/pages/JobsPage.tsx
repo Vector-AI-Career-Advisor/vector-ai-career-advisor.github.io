@@ -1,36 +1,43 @@
-// src/pages/JobsPage.tsx  (full replacement)
+// src/pages/JobsPage.tsx
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchJobs, Job } from '../api/jobs'
+import { fetchJobs, Job, JobFilters } from '../api/jobs'
 import { useAuth } from '../hooks/useAuth'
 import JobCard from '../components/JobCard'
 import JobDrawer from '../components/JobDrawer'
 import AgentChat from '../components/AgentChat'
 import StatsPage from './StatsPage'
+import ProfilePage, { savePreset, loadPresets, FilterPreset } from './ProfilePage'
 import './JobsPage.css'
 
 const SENIORITIES = ['', 'Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
 const LIMIT = 50
 
-type Tab = 'jobs' | 'stats'
+type Tab = 'jobs' | 'stats' | 'profile'
 
 export default function JobsPage() {
   const { handleLogout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('jobs')
 
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [loading, setLoading] = useState(true)
+  const [jobs, setJobs]           = useState<Job[]>([])
+  const [loading, setLoading]     = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Job | null>(null)
-  const [offset, setOffset] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
-  const [total, setTotal] = useState(0)
+  const [error, setError]         = useState<string | null>(null)
+  const [selected, setSelected]   = useState<Job | null>(null)
+  const [offset, setOffset]       = useState(0)
+  const [hasMore, setHasMore]     = useState(true)
+  const [total, setTotal]         = useState(0)
 
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword]     = useState('')
   const [seniority, setSeniority] = useState('')
-  const [location, setLocation] = useState('')
+  const [location, setLocation]   = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
+
+  // Save-filter UX
+  const [showSaveModal, setShowSaveModal]   = useState(false)
+  const [presetName, setPresetName]         = useState('')
+  const [savedMsg, setSavedMsg]             = useState(false)
+  const [presets, setPresets]               = useState<FilterPreset[]>([])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
@@ -39,6 +46,9 @@ export default function JobsPage() {
     return () => clearTimeout(t)
   }, [keyword])
 
+  // Refresh preset count badge whenever the presets change
+  useEffect(() => { setPresets(loadPresets()) }, [activeTab])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -46,7 +56,7 @@ export default function JobsPage() {
     setHasMore(true)
     try {
       const res = await fetchJobs({
-        keyword: debouncedKeyword || undefined,
+        keyword:  debouncedKeyword || undefined,
         seniority: seniority || undefined,
         location: location || undefined,
         limit: LIMIT,
@@ -70,7 +80,7 @@ export default function JobsPage() {
     setLoadingMore(true)
     try {
       const res = await fetchJobs({
-        keyword: debouncedKeyword || undefined,
+        keyword:  debouncedKeyword || undefined,
         seniority: seniority || undefined,
         location: location || undefined,
         limit: LIMIT,
@@ -81,9 +91,7 @@ export default function JobsPage() {
       const newOffset = offset + res.items.length
       setOffset(newOffset)
       setHasMore(newOffset < res.total)
-    } catch {
-      // silent fail on load-more
-    } finally {
+    } catch { /* silent fail */ } finally {
       setLoadingMore(false)
     }
   }, [loadingMore, hasMore, offset, debouncedKeyword, seniority, location])
@@ -113,6 +121,30 @@ export default function JobsPage() {
 
   const hasFilters = keyword || seniority || location
 
+  // Apply a saved preset from ProfilePage
+  const handleApplyFilter = (filters: JobFilters) => {
+    if (filters.keyword   !== undefined) setKeyword(filters.keyword ?? '')
+    if (filters.seniority !== undefined) setSeniority(filters.seniority ?? '')
+    if (filters.location  !== undefined) setLocation(filters.location ?? '')
+    setActiveTab('jobs')
+  }
+
+  // Save current filters as a preset
+  const handleSavePreset = () => {
+    if (!presetName.trim()) return
+    savePreset({
+      name: presetName.trim(),
+      keyword:  keyword  || undefined,
+      seniority: seniority || undefined,
+      location: location || undefined,
+    })
+    setPresets(loadPresets())
+    setPresetName('')
+    setShowSaveModal(false)
+    setSavedMsg(true)
+    setTimeout(() => setSavedMsg(false), 2500)
+  }
+
   return (
     <div className="jobs-root">
       <nav className="navbar">
@@ -136,6 +168,7 @@ export default function JobsPage() {
             </svg>
             Jobs
           </button>
+
           <button
             className={`nav-tab ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
@@ -148,6 +181,21 @@ export default function JobsPage() {
             </svg>
             Statistics
           </button>
+
+          <button
+            className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Profile
+            {presets.length > 0 && (
+              <span className="tab-badge">{presets.length}</span>
+            )}
+          </button>
         </div>
 
         <div className="navbar-right">
@@ -158,14 +206,21 @@ export default function JobsPage() {
         </div>
       </nav>
 
-      {/* ── Statistics view (full-width) ── */}
+      {/* ── Statistics view ── */}
       {activeTab === 'stats' && (
         <div className="stats-view">
           <StatsPage />
         </div>
       )}
 
-      {/* ── Jobs view (two-column) ── */}
+      {/* ── Profile view ── */}
+      {activeTab === 'profile' && (
+        <div className="stats-view">
+          <ProfilePage onApplyFilter={handleApplyFilter} />
+        </div>
+      )}
+
+      {/* ── Jobs view ── */}
       {activeTab === 'jobs' && (
         <div className="page-columns">
 
@@ -221,6 +276,32 @@ export default function JobsPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* ── Save Filters ── */}
+                <div className="filter-group" style={{ marginTop: 'auto', paddingTop: '0.5rem' }}>
+                  <button
+                    className={`btn-save-filters ${!hasFilters ? 'btn-save-filters--dim' : ''}`}
+                    onClick={() => hasFilters && setShowSaveModal(true)}
+                    disabled={!hasFilters}
+                    title={!hasFilters ? 'Set at least one filter to save' : 'Save current filters'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                    </svg>
+                    Save filters
+                  </button>
+
+                  {savedMsg && (
+                    <p className="save-success-msg">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Saved to your profile
+                    </p>
+                  )}
                 </div>
               </aside>
 
@@ -281,6 +362,39 @@ export default function JobsPage() {
       )}
 
       <JobDrawer job={selected} onClose={() => setSelected(null)} />
+
+      {/* ── Save Preset Modal ── */}
+      {showSaveModal && (
+        <>
+          <div className="modal-overlay-jobs" onClick={() => setShowSaveModal(false)} />
+          <div className="modal-jobs">
+            <h3 className="modal-title-jobs">Name this filter preset</h3>
+            <p className="modal-sub-jobs">
+              {[keyword, seniority, location].filter(Boolean).join(' · ')}
+            </p>
+            <input
+              className="modal-input-jobs"
+              placeholder="e.g. Senior Berlin Python"
+              value={presetName}
+              onChange={e => setPresetName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSavePreset()}
+              autoFocus
+            />
+            <div className="modal-actions-jobs">
+              <button className="btn-modal-cancel-jobs" onClick={() => setShowSaveModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn-modal-save-jobs"
+                onClick={handleSavePreset}
+                disabled={!presetName.trim()}
+              >
+                Save preset
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from db.database import get_connection
-from core.security import hash_password, verify_password, create_access_token
+from core.security import hash_password, verify_password, create_access_token, get_current_user
 from models.schemas import UserCreate, UserLogin, TokenResponse
 
 router = APIRouter()
@@ -39,5 +39,23 @@ def login(user: UserLogin):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         return TokenResponse(access_token=create_access_token(row[0]))
+    finally:
+        conn.close()
+
+
+@router.get("/me")
+def get_me(user_id: str = Depends(get_current_user)):
+    """Return the current user's public profile info."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT email, created_at FROM users WHERE id = %s",
+                (int(user_id),),
+            )
+            row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"email": row[0], "created_at": row[1]}
     finally:
         conn.close()

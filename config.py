@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os
 
-load_dotenv(override=False)  #don't override vars already set by Docker
+load_dotenv(override=False)  
 
 # ───────── Database config ─────────
 DB_CONFIG = {
