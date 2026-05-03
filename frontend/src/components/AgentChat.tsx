@@ -113,7 +113,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
         { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date() },
       ])
     } catch {
-      setError('Failed to reach the agent. Please try again.')
+      setError('Failed to reach the agents. Please try again.')
     } finally {
       setIsTyping(false)
       inputRef.current?.focus()

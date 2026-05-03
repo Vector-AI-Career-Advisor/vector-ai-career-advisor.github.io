@@ -8,8 +8,8 @@ import time
 from typing import List
 from selenium.common.exceptions import InvalidSessionIdException, WebDriverException
 import config
-from db.chroma import get_existing_ids, init_chroma, upsert_jobs
-from db.postgres import (
+from backend.db.chroma import get_existing_ids, init_chroma, upsert_jobs
+from backend.db.postgres import (
     count_jobs_today,
     fetch_all_ids,
     fetch_jobs_missing_from_chroma,
@@ -18,8 +18,7 @@ from db.postgres import (
     insert_jobs,
 )
 from pipeline.extractor import extract_all_parallel
-from pipeline.utils import fmt
-from scraper.scraper import build_driver, scrape_keyword
+from pipeline.scraper import build_driver, scrape_keyword
 
 log = logging.getLogger(__name__)
 

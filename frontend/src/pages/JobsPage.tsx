@@ -354,7 +354,7 @@ export default function JobsPage() {
             </div>
           </div>
 
-          {/* RIGHT: agent chat panel */}
+          {/* RIGHT: agents chat panel */}
           <div className="right-column">
             <AgentChat selectedJob={selected} jobs={jobs} />
           </div>

@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, resumes, agent_chat
@@ -22,7 +26,7 @@ def on_startup():
 app.include_router(auth.router,       prefix="/auth",    tags=["auth"])
 app.include_router(jobs.router,       prefix="/jobs",    tags=["jobs"])
 app.include_router(resumes.router,    prefix="/resumes", tags=["resumes"])
-app.include_router(agent_chat.router, prefix="/agent",   tags=["agent"])
+app.include_router(agent_chat.router, prefix="/agents",   tags=["agents"])
 
 @app.get("/")
 def root():

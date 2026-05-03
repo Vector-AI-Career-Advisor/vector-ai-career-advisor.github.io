@@ -1,6 +1,6 @@
 import unittest
 from langchain_core.messages import HumanMessage
-from agent import build_agent
+from backend.agents import build_agent
 
 #colors
 

@@ -1,8 +1,8 @@
 
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, Query
-from db.database import get_connection
+from backend.db.database import get_connection
 from core.security import get_current_user
 from models.schemas import JobOut
 
