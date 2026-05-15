@@ -1,1 +1,1 @@
-from .database import get_connection
+from .postgres import get_connection

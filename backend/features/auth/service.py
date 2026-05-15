@@ -1,12 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
-from db.database import get_connection
-from core.security import hash_password, verify_password, create_access_token, get_current_user
-from models.schemas import UserCreate, UserLogin, TokenResponse
-
-router = APIRouter()
+from fastapi import HTTPException
+from db.postgres import get_connection
+from core.security import hash_password, verify_password, create_access_token
+from features.auth.schemas import UserCreate, UserLogin, TokenResponse
 
 
-@router.post("/signup", status_code=201)
 def signup(user: UserCreate):
     conn = get_connection()
     try:
@@ -25,8 +22,7 @@ def signup(user: UserCreate):
         conn.close()
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(user: UserLogin):
+def login(user: UserLogin) -> TokenResponse:
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -43,9 +39,7 @@ def login(user: UserLogin):
         conn.close()
 
 
-@router.get("/me")
-def get_me(user_id: str = Depends(get_current_user)):
-    """Return the current user's public profile info."""
+def get_me(user_id: str) -> dict:
     conn = get_connection()
     try:
         with conn.cursor() as cur:

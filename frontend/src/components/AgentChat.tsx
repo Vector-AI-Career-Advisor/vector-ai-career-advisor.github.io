@@ -25,7 +25,7 @@ async function callAgent(
   selectedJob: Job | null,
   history: Message[]
 ): Promise<string> {
-  const { data } = await api.post('/agent/chat', {
+  const { data } = await api.post('/agents/chat', {
     message,
     job_id: selectedJob?.id ?? null,
     history: history

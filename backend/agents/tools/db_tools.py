@@ -8,7 +8,7 @@ import psycopg2
 import psycopg2.extras
 from langchain.tools import tool
 
-from backend.db.database import get_connection
+from backend.db.postgres import get_connection
 from backend.db.chroma import init_chroma, search_jobs as chroma_search
 
 # ── helpers ───────────────────────────────────────────────────────────────

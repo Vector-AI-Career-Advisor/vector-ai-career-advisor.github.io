@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import InvalidSessionIdException, WebDriverException
 
 from config import CHROME_VERSION, DATE_FILTER
-from pipeline.utils import parse_posted_date, fmt
+from ..utils import parse_posted_date, fmt
 
 log = logging.getLogger(__name__)
 

@@ -37,7 +37,7 @@ CHROMA_COLLECTION=linkedin_jobs_test
 ### 4. Run the project
 
 ```bash
-python main.py
+python cli.py
 ```
 
 ---

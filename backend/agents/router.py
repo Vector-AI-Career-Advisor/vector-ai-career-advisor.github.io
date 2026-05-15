@@ -1,5 +1,4 @@
 from __future__ import annotations
-import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
@@ -7,8 +6,8 @@ from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, AIMessage
 
 from core.security import get_current_user
-from backend.agents.orchestrator import build_orchestrator
-from backend.agents.tools.resume_tools import set_current_user
+from agents.orchestrator import build_orchestrator
+from agents.tools.resume_tools import set_current_user
 
 router = APIRouter()
 

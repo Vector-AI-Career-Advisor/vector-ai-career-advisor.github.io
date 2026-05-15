@@ -17,8 +17,8 @@ from backend.db.postgres import (
     init_db,
     insert_jobs,
 )
-from pipeline.extractor import extract_all_parallel
-from pipeline.scraper import build_driver, scrape_keyword
+from .extractor import extract_all_parallel
+from .scraper import build_driver, scrape_keyword
 
 log = logging.getLogger(__name__)
 

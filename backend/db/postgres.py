@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional
 import psycopg2
 from psycopg2.extras import execute_values
-from config import DB_CONFIG
+from core.config import DB_CONFIG
 
 log = logging.getLogger(__name__)
 
@@ -17,64 +17,68 @@ def get_connection():
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
-def init_db(conn) -> None:
-    """Create the jobs table and supporting indexes if they do not exist."""
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS jobs (
-                id                TEXT PRIMARY KEY,
-                title             TEXT,
-                role              TEXT,
-                seniority         TEXT,
-                company           TEXT,
-                location          TEXT,
-                url               TEXT,
-                description       TEXT,
-                skills_must       TEXT[],
-                skills_nice       TEXT[],
-                yearsexperience   INTEGER,
-                past_experience   TEXT[],
-                keyword           TEXT,
-                source            TEXT DEFAULT 'linkedin',
-                posted_at         DATE,
-                scraped_at        TIMESTAMP DEFAULT NOW()
-            );
-        """)
-
-        # Add logo_url to existing tables that were created before this migration
-        cur.execute("""
-            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS logo_url TEXT;
-        """)
-
-        # Indexes — created with IF NOT EXISTS so repeated calls are safe
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS jobs_scraped_date_idx
-                ON jobs ((scraped_at::date));
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS jobs_keyword_idx
-                ON jobs (keyword);
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS jobs_role_idx
-                ON jobs (role);
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS jobs_seniority_idx
-                ON jobs (seniority);
-        """)
-
-    conn.commit()
+def init_db(conn=None) -> None:
+    """Create all required tables and indexes. Accepts an optional existing connection."""
+    _own_conn = conn is None
+    if _own_conn:
+        conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id         SERIAL PRIMARY KEY,
+                    email      TEXT UNIQUE NOT NULL,
+                    password   TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS resumes (
+                    id          SERIAL PRIMARY KEY,
+                    user_id     INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    filename    TEXT NOT NULL,
+                    content     TEXT NOT NULL,
+                    uploaded_at TIMESTAMP DEFAULT NOW(),
+                    updated_at  TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id               TEXT PRIMARY KEY,
+                    title            TEXT,
+                    role             TEXT,
+                    seniority        TEXT,
+                    company          TEXT,
+                    location         TEXT,
+                    url              TEXT,
+                    description      TEXT,
+                    skills_must      TEXT[],
+                    skills_nice      TEXT[],
+                    yearsexperience  INTEGER,
+                    past_experience  TEXT[],
+                    keyword          TEXT,
+                    source           TEXT DEFAULT 'linkedin',
+                    posted_at        DATE,
+                    scraped_at       TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS logo_url TEXT;")
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS jobs_scraped_date_idx ON jobs ((scraped_at::date));
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS jobs_keyword_idx ON jobs (keyword);")
+            cur.execute("CREATE INDEX IF NOT EXISTS jobs_role_idx ON jobs (role);")
+            cur.execute("CREATE INDEX IF NOT EXISTS jobs_seniority_idx ON jobs (seniority);")
+        conn.commit()
+    finally:
+        if _own_conn:
+            conn.close()
     log.info("DB schema and indexes ready.")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _to_date(val) -> Optional[date]:
-    """
-    Coerce a posted_at value to a Python date object (or None).
-    Accepts: date, datetime, ISO string 'YYYY-MM-DD', or None.
-    """
     if val is None:
         return None
     if isinstance(val, date):
@@ -145,14 +149,12 @@ def count_jobs_today(conn) -> int:
 
 
 def fetch_all_ids(conn) -> set:
-    """Return all known job IDs — used to skip duplicates during scraping."""
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM jobs;")
         return {row[0] for row in cur.fetchall()}
 
 
 def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
-    """Fetch full job rows for a given list of IDs."""
     if not ids:
         return []
     with conn.cursor() as cur:
@@ -168,9 +170,6 @@ def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
 
 
 def fetch_jobs_missing_from_chroma(conn, chroma_job_ids: set) -> List[dict]:
-    """
-    Return jobs that exist in Postgres but are missing from ChromaDB.
-    """
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM jobs;")
         all_ids = [row[0] for row in cur.fetchall()]
