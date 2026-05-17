@@ -10,6 +10,7 @@ from features.auth.router import router as auth_router
 from features.jobs.router import router as jobs_router
 from features.resumes.router import router as resumes_router
 from features.stats.router import router as stats_router
+from features.applications.router import router as applications_router
 from agents.router import router as agent_router
 from db.postgres import init_db
 
@@ -31,8 +32,9 @@ def on_startup():
 app.include_router(auth_router,    prefix="/auth",    tags=["auth"])
 app.include_router(stats_router,   prefix="/jobs",    tags=["jobs"])   # /jobs/stats — must be before jobs_router
 app.include_router(jobs_router,    prefix="/jobs",    tags=["jobs"])
-app.include_router(resumes_router, prefix="/resumes", tags=["resumes"])
-app.include_router(agent_router,   prefix="/agents",  tags=["agents"])
+app.include_router(resumes_router,      prefix="/resumes",      tags=["resumes"])
+app.include_router(applications_router, prefix="/applications", tags=["applications"])
+app.include_router(agent_router,        prefix="/agents",       tags=["agents"])
 
 @app.get("/")
 def root():

@@ -8,8 +8,9 @@ export default defineConfig({
     proxy: {
       '/auth':    'http://localhost:8000',
       '/jobs':    'http://localhost:8000',
-      '/resumes': 'http://localhost:8000',
-      '/agent':   'http://localhost:8000',
+      '/resumes':      'http://localhost:8000',
+      '/applications': 'http://localhost:8000',
+      '/agent':        'http://localhost:8000',
     },
   },
 })

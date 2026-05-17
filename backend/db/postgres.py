@@ -9,7 +9,7 @@ from core.config import DB_CONFIG
 log = logging.getLogger(__name__)
 
 
-# ── Connection ────────────────────────────────────────────────────────────────
+2# ── Connection ────────────────────────────────────────────────────────────────
 
 def get_connection():
     return psycopg2.connect(**DB_CONFIG)
