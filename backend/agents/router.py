@@ -1,13 +1,16 @@
 from __future__ import annotations
+import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from langchain_core.messages import HumanMessage, AIMessage
 
 from core.security import get_current_user
 from agents.orchestrator import build_orchestrator
 from agents.tools.resume_tools import set_current_user
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,7 +60,11 @@ def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
 
     lc_history.append(HumanMessage(content=message))
 
-    result = agent.invoke({"messages": lc_history})
-    reply  = result["messages"][-1].content
+    try:
+        result = agent.invoke({"messages": lc_history})
+        reply = result["messages"][-1].content
+    except Exception:
+        log.exception("Agent invocation failed for user %s", user_id)
+        raise HTTPException(status_code=500, detail="Agent failed to process the request")
 
     return ChatResponse(reply=reply)
