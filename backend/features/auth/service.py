@@ -37,12 +37,15 @@ def login(user: UserLogin) -> TokenResponse:
             )
             row = cur.fetchone()
 
-        log.warning("Failed login attempt for email: %s", user.email)
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not row or not verify_password(user.password, row[1]):
+            log.warning("Failed login attempt for email: %s", user.email)
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
         return TokenResponse(access_token=create_access_token(row[0]))
+
     finally:
         conn.close()
+
 
 
 def get_me(user_id: str) -> dict:
