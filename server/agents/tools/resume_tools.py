@@ -16,7 +16,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
-from backend.db import get_connection
+from server.db import get_connection
 
 # Shared user context — set once at startup via set_current_user().
 # Imported by agent.py (main entry point) so all tool modules share the same dict.

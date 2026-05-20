@@ -9,14 +9,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-from backend.agents.orchestrator import build_orchestrator
-from backend.agents.tools.resume_tools import set_current_user, _context
+from server.agents.orchestrator import build_orchestrator
+from server.agents.tools.resume_tools import set_current_user, _context
 
 load_dotenv()
 
 def _resolve_user(email: str) -> int | None:
     """Look up a user by email and return their ID, or None if not found."""
-    from backend.db.postgres import get_connection
+    from server.db.postgres import get_connection
 
     conn = get_connection()
     try:
@@ -66,7 +66,7 @@ def main():
                 print("Error: not signed in. Enter your email at startup to use resume features.")
                 continue
             # Delegate directly to the resume tool (no agent overhead needed here).
-            from backend.agents.tools.resume_tools import upload_resume
+            from server.agents.tools.resume_tools import upload_resume
             result = upload_resume.invoke({"path": path})
             print(result.get("message") or result.get("error"), "\n")
             continue

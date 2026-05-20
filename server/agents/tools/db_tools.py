@@ -8,8 +8,8 @@ import psycopg2
 import psycopg2.extras
 from langchain.tools import tool
 
-from backend.db.postgres import get_connection
-from backend.db.chroma import init_chroma, search_jobs as chroma_search
+from server.db.postgres import get_connection
+from server.db.chroma import init_chroma, search_jobs as chroma_search
 
 # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ def _run_query(sql: str, params: tuple = (), description: str = ""):
 def semantic_search_jobs(query: str, n_results: int = 5):
     """Search jobs using semantic similarity (vector search).
     Use for: finding jobs by natural-language description, skill match, or profile.
-    Examples: 'find Python backend jobs', 'jobs at fintech startups'
+    Examples: 'find Python server jobs', 'jobs at fintech startups'
     """
     collection = _collection()
     hits = chroma_search(collection, query, n_results=n_results)
@@ -133,7 +133,7 @@ def search_jobs_by_criteria(
     max_experience: Optional[int] = None,
 ):
     """Filter jobs by specific fields.
-    - role: e.g. 'backend', 'react developer'
+    - role: e.g. 'server', 'react developer'
     - location: e.g. 'Tel Aviv', 'remote'
     - company: e.g. 'Google', 'startup'
     - max_experience: maximum years of experience required

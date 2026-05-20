@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Resolve paths relative to backend/ so relative .env values (e.g. "./chroma_db")
-# always land inside backend/ regardless of the process working directory.
+# Resolve paths relative to server/ so relative .env values (e.g. "./chroma_db")
+# always land inside server/ regardless of the process working directory.
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -51,7 +51,7 @@ DAILY_TARGET   = int(os.getenv("DAILY_TARGET", 50))
 KEYWORDS = [
     "software engineer", "software developer", "fullstack developer", "full stack developer",
     "developer", "software", "programmer", "r&d",
-    "backend", "backend developer", "frontend", "frontend developer",
+    "server", "server developer", "client", "client developer",
     "fullstack", "full stack", "web", "application", "systems",
     "python", "java", "javascript", "typescript", "go", "ruby", "php", "kotlin",
     "react", "angular", "html", "css",

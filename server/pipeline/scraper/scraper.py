@@ -9,7 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import InvalidSessionIdException, WebDriverException
 
-from backend.core.config import CHROME_VERSION, DATE_FILTER
+from server.core.config import CHROME_VERSION, DATE_FILTER
 from ..utils import parse_posted_date, fmt
 
 log = logging.getLogger(__name__)

@@ -7,9 +7,9 @@ import logging
 import time
 from typing import List
 from selenium.common.exceptions import InvalidSessionIdException, WebDriverException
-from backend.core.config import DAILY_TARGET, KEYWORDS
-from backend.db.chroma import get_existing_ids, init_chroma, upsert_jobs
-from backend.db.postgres import (
+from server.core.config import DAILY_TARGET, KEYWORDS
+from server.db.chroma import get_existing_ids, init_chroma, upsert_jobs
+from server.db.postgres import (
     count_jobs_today,
     fetch_all_ids,
     fetch_jobs_missing_from_chroma,

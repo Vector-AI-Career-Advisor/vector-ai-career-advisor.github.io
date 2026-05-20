@@ -10,7 +10,7 @@ from typing import Optional
 
 import requests
 
-from backend.core.config import (
+from server.core.config import (
     EXTRACTION_PROMPT,
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
@@ -280,9 +280,9 @@ def _infer_role(title: str) -> str:
     """Keyword-based role fallback when the LLM returns an unrecognised value."""
     t = title.lower()
     checks = [
-        (["frontend", "front-end", "front end", "ui developer", "react developer",
+        (["client", "front-end", "front end", "ui developer", "react developer",
           "angular developer", "vue developer", "web developer"],        "Frontend"),
-        (["backend", "back-end", "back end", "server-side", "node developer"],   "Backend"),
+        (["server", "back-end", "back end", "server-side", "node developer"],   "Backend"),
         (["fullstack", "full-stack", "full stack"],                               "Fullstack"),
         (["machine learning", "deep learning", "nlp", "computer vision",
           "llm", "ai engineer", "ml engineer", "artificial intelligence"],        "AI / ML"),

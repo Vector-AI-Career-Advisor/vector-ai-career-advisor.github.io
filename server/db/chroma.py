@@ -5,7 +5,7 @@ import chromadb
 from chromadb.config import Settings
 from core.config import CHROMA_PERSIST_DIR, CHROMA_COLLECTION
 from .embeddings import get_embeddings
-from backend.pipeline.utils import build_chroma_metadata
+from server.pipeline.utils import build_chroma_metadata
 
 log = logging.getLogger(__name__)
 
