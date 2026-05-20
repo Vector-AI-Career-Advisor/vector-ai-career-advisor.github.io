@@ -25,25 +25,19 @@ function formatDate(iso: string) {
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set())
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState<string | null>(null)
+  const [updatingIds, setUpdatingIds]   = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchApplications()
-      .then(data => {
-        const sorted = [...data].sort(
-          (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
-        )
-        setApplications(sorted)
-      })
+      .then(data => setApplications(data))
       .catch(() => setError('Failed to load applications.'))
       .finally(() => setLoading(false))
   }, [])
 
   async function handleStatusChange(app: Application, newStatus: Application['status']) {
     const prev = app.status
-    // Optimistic update
     setApplications(curr =>
       curr.map(a => a.application_id === app.application_id ? { ...a, status: newStatus } : a)
     )
@@ -51,7 +45,6 @@ export default function ApplicationsPage() {
     try {
       await updateApplicationStatus(app.job_id, newStatus)
     } catch {
-      // Revert on failure
       setApplications(curr =>
         curr.map(a => a.application_id === app.application_id ? { ...a, status: prev } : a)
       )
@@ -83,6 +76,10 @@ export default function ApplicationsPage() {
     )
   }
 
+  const groups = STATUS_ORDER
+    .map(status => ({ status, rows: applications.filter(a => a.status === status) }))
+    .filter(g => g.rows.length > 0)
+
   return (
     <div className="applications-root">
       <div className="applications-header">
@@ -92,7 +89,7 @@ export default function ApplicationsPage() {
         </div>
       </div>
 
-      {applications.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="applications-empty">
           <div className="applications-empty-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
@@ -106,64 +103,75 @@ export default function ApplicationsPage() {
           <p className="applications-empty-sub">Jobs you apply to will appear here.</p>
         </div>
       ) : (
-        <div className="applications-table-wrap">
-          <table className="applications-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Role</th>
-                <th>Location</th>
-                <th>Seniority</th>
-                <th>Status</th>
-                <th>Applied</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {applications.map(app => (
-                <tr key={app.application_id}>
-                  <td>
-                    <div className="company-cell">
-                      {app.logo_url ? (
-                        <img className="company-logo" src={app.logo_url} alt={app.company} />
-                      ) : (
-                        <div className="company-avatar">
-                          {app.company.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <a
-                        className="company-name"
-                        href={app.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {app.company}
-                      </a>
-                    </div>
-                  </td>
-                  <td className="role-cell">{app.title}</td>
-                  <td className="muted-cell">{app.location}</td>
-                  <td className="muted-cell">{app.seniority ?? '—'}</td>
-                  <td>
-                    <div className={`status-select-wrap status-${app.status}`}>
-                      <select
-                        className="status-select"
-                        value={app.status}
-                        onChange={e => handleStatusChange(app, e.target.value as Application['status'])}
-                        disabled={updatingIds.has(app.application_id)}
-                      >
-                        {STATUS_ORDER.map(s => (
-                          <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </td>
-                  <td className="muted-cell">{formatDate(app.applied_at)}</td>
-                  <td className="notes-cell">{app.notes ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="applications-groups">
+          {groups.map(({ status, rows }) => (
+            <section key={status} className="status-group">
+              <div className="status-group-heading">
+                <span className={`status-badge status-${status}`}>{STATUS_LABEL[status]}</span>
+                <span className="status-group-count">{rows.length}</span>
+              </div>
+
+              <div className="applications-table-wrap">
+                <table className="applications-table">
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Role</th>
+                      <th>Location</th>
+                      <th>Seniority</th>
+                      <th>Status</th>
+                      <th>Applied</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(app => (
+                      <tr key={app.application_id}>
+                        <td>
+                          <div className="company-cell">
+                            {app.logo_url ? (
+                              <img className="company-logo" src={app.logo_url} alt={app.company} />
+                            ) : (
+                              <div className="company-avatar">
+                                {app.company.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <a
+                              className="company-name"
+                              href={app.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {app.company}
+                            </a>
+                          </div>
+                        </td>
+                        <td className="role-cell">{app.title}</td>
+                        <td className="muted-cell">{app.location}</td>
+                        <td className="muted-cell">{app.seniority ?? '—'}</td>
+                        <td>
+                          <div className={`status-select-wrap status-${app.status}`}>
+                            <select
+                              className="status-select"
+                              value={app.status}
+                              onChange={e => handleStatusChange(app, e.target.value as Application['status'])}
+                              disabled={updatingIds.has(app.application_id)}
+                            >
+                              {STATUS_ORDER.map(s => (
+                                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="muted-cell">{formatDate(app.applied_at)}</td>
+                        <td className="notes-cell">{app.notes ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>

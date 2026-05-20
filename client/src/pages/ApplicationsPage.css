@@ -81,6 +81,26 @@
   color: var(--muted);
 }
 
+/* ── Status groups ── */
+.applications-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.status-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.status-group-count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
 /* ── Table wrapper ── */
 .applications-table-wrap {
   background: var(--surface);
