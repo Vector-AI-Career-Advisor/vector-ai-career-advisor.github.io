@@ -144,6 +144,107 @@
   transform: translateY(-1px);
 }
 
+.btn-applied {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(34,197,94,0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: var(--radius);
+  padding: 0.65rem 1.25rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Confirm dialog */
+.confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-dialog {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: calc(var(--radius) * 1.5);
+  padding: 1.75rem 2rem;
+  width: min(320px, 90%);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+  text-align: center;
+}
+
+.confirm-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.confirm-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.confirm-yes {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.5rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: background 0.15s;
+  min-width: 80px;
+}
+
+.confirm-yes:hover:not(:disabled) {
+  background: #6b59e8;
+}
+
+.confirm-yes:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.confirm-no {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 1.5rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.15s;
+  min-width: 80px;
+}
+
+.confirm-no:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border2);
+}
+
+.confirm-no:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Body */
 .drawer-body {
   flex: 1;

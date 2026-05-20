@@ -21,3 +21,14 @@ export async function fetchApplications(status?: string): Promise<Application[]>
   const res = await api.get<Application[]>('/applications/', { params })
   return res.data
 }
+
+export async function createApplication(jobId: string): Promise<void> {
+  await api.post('/applications/', { job_id: jobId })
+}
+
+export async function updateApplicationStatus(
+  jobId: string,
+  status: Application['status'],
+): Promise<void> {
+  await api.patch(`/applications/${jobId}`, { status })
+}

@@ -1,7 +1,7 @@
 // src/pages/ApplicationsPage.tsx
 
 import { useState, useEffect } from 'react'
-import { fetchApplications, Application } from '../api/applications'
+import { fetchApplications, updateApplicationStatus, Application } from '../api/applications'
 import './ApplicationsPage.css'
 
 const STATUS_ORDER: Application['status'][] = [
@@ -27,6 +27,7 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchApplications()
@@ -39,6 +40,29 @@ export default function ApplicationsPage() {
       .catch(() => setError('Failed to load applications.'))
       .finally(() => setLoading(false))
   }, [])
+
+  async function handleStatusChange(app: Application, newStatus: Application['status']) {
+    const prev = app.status
+    // Optimistic update
+    setApplications(curr =>
+      curr.map(a => a.application_id === app.application_id ? { ...a, status: newStatus } : a)
+    )
+    setUpdatingIds(curr => new Set(curr).add(app.application_id))
+    try {
+      await updateApplicationStatus(app.job_id, newStatus)
+    } catch {
+      // Revert on failure
+      setApplications(curr =>
+        curr.map(a => a.application_id === app.application_id ? { ...a, status: prev } : a)
+      )
+    } finally {
+      setUpdatingIds(curr => {
+        const next = new Set(curr)
+        next.delete(app.application_id)
+        return next
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -121,9 +145,18 @@ export default function ApplicationsPage() {
                   <td className="muted-cell">{app.location}</td>
                   <td className="muted-cell">{app.seniority ?? '—'}</td>
                   <td>
-                    <span className={`status-badge status-${app.status}`}>
-                      {STATUS_LABEL[app.status]}
-                    </span>
+                    <div className={`status-select-wrap status-${app.status}`}>
+                      <select
+                        className="status-select"
+                        value={app.status}
+                        onChange={e => handleStatusChange(app, e.target.value as Application['status'])}
+                        disabled={updatingIds.has(app.application_id)}
+                      >
+                        {STATUS_ORDER.map(s => (
+                          <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td className="muted-cell">{formatDate(app.applied_at)}</td>
                   <td className="notes-cell">{app.notes ?? '—'}</td>

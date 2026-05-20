@@ -12,20 +12,20 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-echo "Starting backend..."
-cd "$ROOT/backend"
+echo "Starting server..."
+cd "$ROOT/server"
 "$ROOT/.venv/bin/uvicorn" main:app --reload --port 8000 &
 BACKEND_PID=$!
 
-echo "Starting frontend..."
-cd "$ROOT/frontend"
+echo "Starting client..."
+cd "$ROOT/client"
 npm install --silent
 npm run dev &
 FRONTEND_PID=$!
 
 echo ""
-echo "Backend:  http://localhost:8000"
-echo "Frontend: http://localhost:5173"
+echo "Server:  http://localhost:8000"
+echo "Client: http://localhost:5173"
 echo ""
 echo "Press Ctrl+C to stop."
 

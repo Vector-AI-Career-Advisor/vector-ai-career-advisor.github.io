@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react'
 import { Job } from '../api/jobs'
+import { createApplication } from '../api/applications'
 import './JobDrawer.css'
 
 interface Props {
@@ -7,7 +9,39 @@ interface Props {
 }
 
 export default function JobDrawer({ job, onClose }: Props) {
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applied, setApplied] = useState(false)
+
+  // Reset dialog state whenever a different job is opened
+  useEffect(() => {
+    setShowConfirm(false)
+    setApplying(false)
+    setApplied(false)
+  }, [job?.id])
+
   if (!job) return null
+
+  function handleApplyClick() {
+    if (job?.url) window.open(job.url, '_blank', 'noopener,noreferrer')
+    setShowConfirm(true)
+  }
+
+  async function handleConfirmYes() {
+    setApplying(true)
+    try {
+      await createApplication(job!.id)
+    } catch (err: any) {
+      // 409 means already tracked — still treat as success
+      if (err?.response?.status !== 409) {
+        console.error('Failed to save application:', err)
+      }
+    } finally {
+      setApplying(false)
+      setApplied(true)
+      setShowConfirm(false)
+    }
+  }
 
   return (
     <>
@@ -42,10 +76,13 @@ export default function JobDrawer({ job, onClose }: Props) {
           </div>
 
           {job.url && (
-            <a href={job.url} target="_blank" rel="noopener noreferrer"
-              className="btn-apply">
-              Apply Now ↗
-            </a>
+            applied ? (
+              <span className="btn-applied"><CheckIcon />Applied</span>
+            ) : (
+              <button className="btn-apply" onClick={handleApplyClick}>
+                Apply Now ↗
+              </button>
+            )
           )}
         </div>
 
@@ -84,6 +121,31 @@ export default function JobDrawer({ job, onClose }: Props) {
             </Section>
           )}
         </div>
+
+        {showConfirm && (
+          <div className="confirm-backdrop">
+            <div className="confirm-dialog">
+              <p className="confirm-title">Did you apply?</p>
+              <p className="confirm-sub">We'll track it in your applications.</p>
+              <div className="confirm-actions">
+                <button
+                  className="confirm-yes"
+                  onClick={handleConfirmYes}
+                  disabled={applying}
+                >
+                  {applying ? 'Saving…' : 'Yes'}
+                </button>
+                <button
+                  className="confirm-no"
+                  onClick={() => setShowConfirm(false)}
+                  disabled={applying}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   )
@@ -95,6 +157,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h4 className="drawer-section-title">{title}</h4>
       {children}
     </div>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
   )
 }
 
