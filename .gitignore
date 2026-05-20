@@ -23,6 +23,11 @@ chroma_db/
 *.sqlite3
 *.parquet
 
+# Ollama model weights (safety net — weights normally live in ~/.ollama/models/)
+*.gguf
+*.bin
+models/
+
 
 # Database dumps
 *.sql

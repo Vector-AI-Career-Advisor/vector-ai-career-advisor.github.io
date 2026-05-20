@@ -1,165 +1,59 @@
-"""
-LLM-based job description extraction using Groq.
-
-Key improvements over v1:
-- Smart description pre-processing: strips boilerplate/HTML noise before
-  sending to Groq, preserving ALL semantically meaningful content so field
-  quality is not degraded.
-- Token-aware truncation: estimates token count and only truncates when
-  truly necessary, keeping as much of the description as possible.
-- Retry-After header parsing: honours the exact cooldown Groq signals
-  instead of using arbitrary exponential back-off that burns retries too
-  fast or waits longer than needed.
-- Token-bucket rate limiter per key: tracks requests-per-minute AND
-  tokens-per-minute so we stay under both limits simultaneously.
-- Groq client reuse: one client instance per key (not recreated every call).
-- Logo field removed entirely.
-- Cleaner separation between rate-limit flavours (RPM vs TPD).
-"""
-
+"""LLM-based job description extraction using a local Ollama model."""
 from __future__ import annotations
 
 import json
 import logging
-import random
 import re
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
-from groq import APIConnectionError, Groq, RateLimitError
-from config import (
+import requests
+
+from backend.core.config import (
     EXTRACTION_PROMPT,
-    ANTHROPIC_API_KEY,
-    ANTHROPIC_MODEL,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
     VALID_ROLES,
     VALID_SENIORITY,
 )
 
 log = logging.getLogger(__name__)
 
-# ── Groq client pool ──────────────────────────────────────────────────────────
-
-_GROQ_KEYS: list[str] = [k for k in [GROQ_API_KEY_EXTRACT, GROQ_API_KEY_CHAT] if k]
-
-if not _GROQ_KEYS:
-    raise RuntimeError(
-        "No Groq API keys configured. Set GROQ_API_KEY_EXTRACT or GROQ_API_KEY_CHAT."
-    )
-
-log.info("Loaded %d Groq key(s).", len(_GROQ_KEYS))
-
-# One persistent client per key — avoids re-initialising TLS on every call.
-_clients: list[Groq] = [Groq(api_key=k) for k in _GROQ_KEYS]
-
-
-# ── Token-bucket rate limiter (per key) ───────────────────────────────────────
-#
-# Groq free-tier limits (llama-3 family): ~30 RPM, ~14 400 TPM per key.
-# We target 25 RPM / 12 000 TPM to leave a comfortable safety margin.
-# Adjust these constants if you upgrade your Groq plan.
-
-_RPM_LIMIT   = 25          # requests per minute per key
-_TPM_LIMIT   = 12_000      # tokens per minute per key
-_WINDOW      = 60.0        # sliding window in seconds
-
-# Rolling log of (timestamp, tokens_used) per key, protected by per-key lock.
-_key_locks:    list[threading.Lock]       = [threading.Lock() for _ in _GROQ_KEYS]
-_key_requests: list[list[float]]          = [[] for _ in _GROQ_KEYS]  # timestamps
-_key_tokens:   list[list[tuple[float, int]]] = [[] for _ in _GROQ_KEYS]  # (ts, n_tokens)
-
-
-def _prune_window(key_idx: int) -> None:
-    """Drop entries older than the sliding window. Must be called under lock."""
-    cutoff = time.time() - _WINDOW
-    _key_requests[key_idx] = [t for t in _key_requests[key_idx] if t > cutoff]
-    _key_tokens[key_idx]   = [(t, n) for t, n in _key_tokens[key_idx] if t > cutoff]
-
-
-def _wait_for_capacity(key_idx: int, estimated_tokens: int) -> None:
-    """
-    Block until this key has both request-slot and token-budget available.
-    Must be called under the key's lock.
-    """
-    while True:
-        _prune_window(key_idx)
-        n_req    = len(_key_requests[key_idx])
-        n_tokens = sum(n for _, n in _key_tokens[key_idx])
-
-        if n_req < _RPM_LIMIT and (n_tokens + estimated_tokens) < _TPM_LIMIT:
-            break
-
-        # Figure out how long until the oldest entry expires.
-        oldest_req = _key_requests[key_idx][0]   if _key_requests[key_idx]   else time.time()
-        oldest_tok = _key_tokens[key_idx][0][0]   if _key_tokens[key_idx]    else time.time()
-        sleep_until = min(oldest_req, oldest_tok) + _WINDOW
-        wait = max(0.2, sleep_until - time.time())
-        log.debug(
-            "Key %d at capacity (req=%d/%d tok=%d/%d) — sleeping %.1fs",
-            key_idx + 1, n_req, _RPM_LIMIT, n_tokens, _TPM_LIMIT, wait,
-        )
-        time.sleep(wait)
-
-
-def _record_usage(key_idx: int, tokens_used: int) -> None:
-    """Log a completed request. Must be called under the key's lock."""
-    now = time.time()
-    _key_requests[key_idx].append(now)
-    _key_tokens[key_idx].append((now, tokens_used))
-
+_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
 
 # ── Description pre-processing ────────────────────────────────────────────────
 #
-# LinkedIn descriptions arrive with repeated boilerplate, bullet-point noise,
-# and sometimes HTML artefacts. Stripping these reduces token spend without
-# losing any structured information the LLM needs.
+# LinkedIn descriptions arrive with boilerplate, bullet-point noise, and
+# occasional HTML artefacts. Stripping these reduces inference time without
+# losing any structured information the model needs.
 
-# Max chars we send to Groq.  At ~4 chars/token this is ~2 500 tokens of
-# input — well within limits while preserving the full semantic content of
-# even very long job ads.
 _MAX_CHARS = 10_000
 
 _BOILERPLATE_PATTERNS = [
-    # Equal-opportunity / legal boilerplate
     r"(equal\s+opportunity|eeo|affirmative\s+action).{0,300}",
-    # "About LinkedIn" / platform ads
     r"linkedin is committed.{0,200}",
-    # Generic benefit lists that add zero extraction value
     r"(we offer|our benefits include|what we offer)[:\s].{0,400}",
 ]
 _BOILERPLATE_RE = re.compile("|".join(_BOILERPLATE_PATTERNS), re.DOTALL | re.IGNORECASE)
-
-# Rough token estimator: 1 token ≈ 4 chars for English/mixed text.
-def _estimate_tokens(text: str) -> int:
-    return max(1, len(text) // 4)
 
 
 def _preprocess_description(raw: str) -> str:
     """
     Clean and intelligently truncate a raw LinkedIn description.
 
-    Strategy:
-    1. Strip obvious HTML artefacts and excess whitespace.
-    2. Remove legal/boilerplate paragraphs.
-    3. If still over _MAX_CHARS, keep the first 70 % and last 30 % so
-       we get the requirements section (usually mid-document) AND the
-       closing details, while discarding the repetitive middle filler.
+    Strips HTML artefacts, collapses whitespace, removes boilerplate, then
+    keeps the first 70 % and last 30 % if still over _MAX_CHARS so that both
+    the intro and the requirements section (usually at the end) are preserved.
     """
-    # Remove HTML tags that occasionally leak through Selenium
     text = re.sub(r"<[^>]+>", " ", raw)
-    # Collapse multiple blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
-    # Strip boilerplate
     text = _BOILERPLATE_RE.sub("", text)
-    # Collapse runs of spaces
     text = re.sub(r" {2,}", " ", text).strip()
 
     if len(text) <= _MAX_CHARS:
         return text
 
-    # Smart truncation: preserve beginning (intro + role overview) and
-    # the end (requirements / qualifications are often listed last).
     head = int(_MAX_CHARS * 0.70)
     tail = _MAX_CHARS - head
     return text[:head] + "\n\n[...]\n\n" + text[-tail:]
@@ -167,107 +61,57 @@ def _preprocess_description(raw: str) -> str:
 
 # ── Public extraction API ─────────────────────────────────────────────────────
 
-def extract_with_groq(
-    title: str,
-    description: str,
-    key_idx: int = 0,
-) -> dict:
-    """
-    Send a job title + description to Groq and return a structured extraction.
-
-    - Preprocesses the description to reduce token usage without quality loss.
-    - Uses per-key token-bucket rate limiting.
-    - Parses Retry-After headers when available.
-    - Retries up to 3 times with key rotation on RPM errors.
-    """
+def extract_with_ollama(title: str, description: str) -> dict:
+    """Send a job title + description to Ollama and return a structured dict."""
     if not description or description == "N/A":
         return _empty_extraction()
 
-    processed   = _preprocess_description(description)
-    est_tokens  = _estimate_tokens(EXTRACTION_PROMPT) + _estimate_tokens(processed) + 50
-    current_key = key_idx % len(_GROQ_KEYS)
+    processed = _preprocess_description(description)
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": EXTRACTION_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Job Title: {title}\n\n"
+                    f"Job Description:\n{processed}\n\n"
+                    "JSON:"
+                ),
+            },
+        ],
+        "stream": False,
+        "options": {"temperature": 0},
+    }
 
     for attempt in range(3):
-        with _key_locks[current_key]:
-            _wait_for_capacity(current_key, est_tokens)
-            client = _clients[current_key]
+        try:
+            resp = requests.post(_CHAT_URL, json=payload, timeout=120)
+            resp.raise_for_status()
+            raw = resp.json()["message"]["content"].strip()
+            return _parse_and_validate(raw, title)
 
-            try:
-                response = client.chat.completions.create(
-                    model=GROQ_MODEL,
-                    messages=[
-                        {"role": "system", "content": EXTRACTION_PROMPT},
-                        {
-                            "role": "user",
-                            "content": (
-                                f"Job Title: {title}\n\n"
-                                f"Job Description:\n{processed}\n\n"
-                                "JSON:"
-                            ),
-                        },
-                    ],
-                    temperature=0,
-                    max_tokens=1500,
-                )
-                tokens_used = getattr(response.usage, "total_tokens", est_tokens)
-                _record_usage(current_key, tokens_used)
+        except json.JSONDecodeError as e:
+            log.warning("Ollama JSON parse error (attempt %d/3): %s", attempt + 1, e)
+            if attempt == 2:
+                return _empty_extraction()
+            time.sleep(2)
 
-                raw = response.choices[0].message.content.strip()
-                return _parse_and_validate(raw, title)
-
-            except json.JSONDecodeError as e:
-                log.warning("Groq JSON parse error (attempt %d/3): %s", attempt + 1, e)
-                if attempt == 2:
-                    return _empty_extraction()
-                time.sleep(2)
-
-            except RateLimitError as e:
-                err_str = str(e)
-
-                # Daily token limit — no point retrying on any key for this job
-                if "tokens per day" in err_str or "TPD" in err_str:
-                    log.warning(
-                        "Groq daily token limit on key %d — skipping job.", current_key + 1
-                    )
-                    return _empty_extraction()
-
-                # Parse Retry-After if Groq provided it (beats guessing)
-                retry_after = _parse_retry_after(e)
-                if retry_after:
-                    log.warning(
-                        "Groq RPM hit on key %d — Retry-After=%ds (attempt %d/3).",
-                        current_key + 1, retry_after, attempt + 1,
-                    )
-                    time.sleep(retry_after + random.uniform(0.5, 2.0))
-                else:
-                    # Rotate key before sleeping
-                    current_key = (current_key + 1) % len(_GROQ_KEYS)
-                    wait = (2 ** attempt) * 10 + random.uniform(0, 5)
-                    log.warning(
-                        "Groq rate limit — rotated to key %d/%d, waiting %.0fs (attempt %d/3).",
-                        current_key + 1, len(_GROQ_KEYS), wait, attempt + 1,
-                    )
-                    time.sleep(wait)
-
-            except APIConnectionError as e:
-                log.warning("Groq connection error (attempt %d/3): %s", attempt + 1, e)
-                if attempt == 2:
-                    return _empty_extraction()
-                time.sleep(5)
-
-            except Exception as e:
-                log.warning("Groq unexpected error (attempt %d/3): %s", attempt + 1, e)
-                if attempt == 2:
-                    return _empty_extraction()
-                time.sleep(2)
+        except requests.RequestException as e:
+            log.warning("Ollama request error (attempt %d/3): %s", attempt + 1, e)
+            if attempt == 2:
+                return _empty_extraction()
+            time.sleep(5)
 
     return _empty_extraction()
 
 
 def extract_all_parallel(stubs: list[dict]) -> list[dict]:
     """
-    Run Groq extraction in parallel — one worker per API key.
-    Returns fully structured job dicts in the same order as `stubs`.
+    Run Ollama extraction with a small thread pool.
+
+    Ollama serialises requests internally on a single GPU, but a pool of
+    workers avoids blocking on network round-trips and keeps the queue full.
     """
     if not stubs:
         return []
@@ -276,26 +120,23 @@ def extract_all_parallel(stubs: list[dict]) -> list[dict]:
     if not valid_stubs:
         return []
 
-    n_workers = len(_GROQ_KEYS)
     results: list[Optional[dict]] = [None] * len(valid_stubs)
 
     def _worker(idx: int, stub: dict) -> tuple[int, dict]:
-        key_idx = idx % n_workers
         log.info(
-            "[%d/%d] Extracting: %s | %s (key %d)",
-            idx + 1, len(valid_stubs), stub["title"], stub["company"], key_idx + 1,
+            "[%d/%d] Extracting: %s | %s",
+            idx + 1, len(valid_stubs), stub["title"], stub["company"],
         )
-        extracted = extract_with_groq(stub["title"], stub["raw_description"], key_idx=key_idx)
-        return idx, extracted
+        return idx, extract_with_ollama(stub["title"], stub["raw_description"])
 
-    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(_worker, i, stub): i for i, stub in enumerate(valid_stubs)}
         for future in as_completed(futures):
+            i = futures[future]
             try:
                 idx, extracted = future.result()
                 results[idx] = extracted
             except Exception as e:
-                i = futures[future]
                 log.error("Extraction worker failed for stub %d: %s", i, e)
                 results[i] = _empty_extraction()
 
@@ -352,28 +193,6 @@ def _filter_valid_stubs(stubs: list[dict]) -> tuple[list[dict], int]:
     return valid, skipped
 
 
-def _parse_retry_after(exc: RateLimitError) -> Optional[int]:
-    """
-    Try to extract a Retry-After value (seconds) from the Groq error response.
-    Returns None if not present.
-    """
-    # Groq SDK exposes the raw response on some versions
-    try:
-        headers = exc.response.headers  # type: ignore[attr-defined]
-        val = headers.get("retry-after") or headers.get("Retry-After")
-        if val:
-            return int(float(val))
-    except Exception:
-        pass
-
-    # Fallback: parse from the error message string
-    match = re.search(r"retry.{0,10}?(\d+)\s*s", str(exc), re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-
-    return None
-
-
 def _parse_and_validate(raw: str, title: str) -> dict:
     """Strip markdown fences, extract JSON, validate and return."""
     if raw.startswith("```"):
@@ -401,7 +220,7 @@ def _empty_extraction() -> dict:
 
 
 def _validate(data: dict, title: str) -> dict:
-    """Validate and normalise a raw Claude extraction dict."""
+    """Validate and normalise a raw extraction dict."""
     empty  = _empty_extraction()
     result = {}
 

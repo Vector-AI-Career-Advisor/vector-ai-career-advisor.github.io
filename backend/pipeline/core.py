@@ -7,7 +7,7 @@ import logging
 import time
 from typing import List
 from selenium.common.exceptions import InvalidSessionIdException, WebDriverException
-import config
+from backend.core.config import DAILY_TARGET, KEYWORDS
 from backend.db.chroma import get_existing_ids, init_chroma, upsert_jobs
 from backend.db.postgres import (
     count_jobs_today,
@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 # ── Step 1: Scrape ────────────────────────────────────────────────────────────
 
-def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
+def run_scrape(daily_target: int = DAILY_TARGET) -> List[dict]:
     """
     Scrape LinkedIn for new jobs up to `daily_target` per day.
     Returns a list of raw stub dicts (with raw_description + posted_at).
@@ -50,7 +50,7 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
     driver = build_driver()
     stubs  = []
 
-    for keyword in config.KEYWORDS:
+    for keyword in KEYWORDS:
         if len(stubs) >= remaining:
             break
 
@@ -98,7 +98,7 @@ def run_scrape(daily_target: int = config.DAILY_TARGET) -> List[dict]:
 
 def run_extract(stubs: List[dict]) -> List[dict]:
     """
-    Run Groq extraction on all stubs in parallel (one worker per API key).
+    Run Ollama extraction on all stubs in parallel.
     Returns a list of fully structured job dicts ready for storage.
     """
     if not stubs:
