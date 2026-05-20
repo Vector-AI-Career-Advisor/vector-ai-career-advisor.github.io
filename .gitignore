@@ -1,6 +1,5 @@
 #Environment
 .env
-.env.*
 
 #Python
 __pycache__/
@@ -23,6 +22,11 @@ chroma_db/
 *.sqlite3
 *.parquet
 
+# Ollama model weights (safety net — weights normally live in ~/.ollama/models/)
+*.gguf
+*.bin
+models/
+
 
 # Database dumps
 *.sql
@@ -44,8 +48,10 @@ Thumbs.db
 *.tmp
 *.temp
 
+#Logs
+server/logs/
+
 #Airflow
-logs/
 airflow.db
 airflow.cfg
 airflow-webserver.pid
