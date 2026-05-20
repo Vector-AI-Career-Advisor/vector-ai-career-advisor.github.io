@@ -49,8 +49,10 @@ Thumbs.db
 *.tmp
 *.temp
 
+#Logs
+server/logs/
+
 #Airflow
-logs/
 airflow.db
 airflow.cfg
 airflow-webserver.pid

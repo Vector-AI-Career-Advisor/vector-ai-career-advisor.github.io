@@ -43,7 +43,7 @@ services:
       - .env
     volumes:
       - .:/opt/career_assistant
-      - ./logs:/opt/airflow/logs
+      - ./server/logs:/opt/airflow/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +63,7 @@ services:
       - .env
     volumes:
       - .:/opt/career_assistant
-      - ./logs:/opt/airflow/logs
+      - ./server/logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     depends_on:
