@@ -7,18 +7,17 @@
 /* ── Hero (left) ── */
 .auth-hero {
   position: relative;
-  background: linear-gradient(135deg, #0f0f1a 0%, #1a1025 50%, #0a0a14 100%);
+  background: linear-gradient(135deg, var(--bg) 0%, var(--surface) 50%, var(--bg) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   padding: 3rem;
-  
 }
 
 .auth-hero-content {
   text-align: center;
-  position: center;
+  position: relative;
   z-index: 2;
 }
 
@@ -66,18 +65,16 @@
   max-width: 340px;
   line-height: 1.7;
   margin-bottom: 2.5rem;
-  text-align: center;   
+  text-align: center;
   margin-left: auto;
-  margin-right: auto; 
+  margin-right: auto;
 }
 
 .auth-stats {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 1.5rem;
-  display: flex;
-  justify-content: center;   /* center all stats */
-  align-items: center;
 }
 
 .stat {
@@ -116,7 +113,6 @@
   height: 600px;
   background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
   pointer-events: none;
-  
 }
 
 .auth-orb {
@@ -129,7 +125,7 @@
 .auth-orb-1 {
   width: 300px;
   height: 300px;
-  background: rgba(124,106,247,0.15);
+  background: color-mix(in srgb, var(--accent2) 15%, transparent);
   top: -80px;
   right: -80px;
   animation: orbFloat 8s ease-in-out infinite;
@@ -138,7 +134,7 @@
 .auth-orb-2 {
   width: 200px;
   height: 200px;
-  background: rgba(196,181,253,0.08);
+  background: color-mix(in srgb, var(--accent2) 8%, transparent);
   bottom: 60px;
   left: 40px;
   animation: orbFloat 11s ease-in-out infinite reverse;
@@ -146,7 +142,7 @@
 
 @keyframes orbFloat {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-30px); }
+  50%       { transform: translateY(-30px); }
 }
 
 /* ── Auth Panel (right) ── */
@@ -169,10 +165,9 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Tabs */
+/* ── Tabs ── */
 .auth-tabs {
   display: flex;
-  gap: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -195,10 +190,10 @@
 .auth-tab.active {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(124,106,247,0.4);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* Form header */
+/* ── Form header ── */
 .auth-form-header {
   margin-bottom: 1.75rem;
 }
@@ -208,6 +203,7 @@
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.02em;
+  color: var(--text);
   margin-bottom: 0.35rem;
 }
 
@@ -216,7 +212,7 @@
   font-size: 0.9rem;
 }
 
-/* Fields */
+/* ── Fields ── */
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -248,24 +244,27 @@
   outline: none;
 }
 
-.field input::placeholder { color: var(--muted); opacity: 0.5; }
+.field input::placeholder {
+  color: var(--muted);
+  opacity: 0.5;
+}
 
 .field input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124,106,247,0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-/* Error */
+/* ── Error ── */
 .auth-error {
-  background: rgba(248,113,113,0.1);
-  border: 1px solid rgba(248,113,113,0.3);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
   border-radius: 8px;
   padding: 0.65rem 0.9rem;
   color: var(--red);
   font-size: 0.85rem;
 }
 
-/* Primary button */
+/* ── Primary button ── */
 .btn-primary {
   background: var(--accent);
   color: #fff;
@@ -276,14 +275,14 @@
   font-weight: 700;
   letter-spacing: 0.01em;
   transition: all 0.2s;
-  box-shadow: 0 4px 16px rgba(124,106,247,0.35);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 35%, transparent);
   margin-top: 0.4rem;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #6b59e8;
+  filter: brightness(0.88);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(124,106,247,0.45);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .btn-primary:disabled {
@@ -305,15 +304,10 @@
   text-underline-offset: 2px;
 }
 
-/* Responsive */
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .auth-root {
     grid-template-columns: 1fr;
-  }
-  .auth-hero {
-    
-    text-align: center;
-    position: center;
   }
   .auth-panel {
     padding: 1.5rem 1rem;
