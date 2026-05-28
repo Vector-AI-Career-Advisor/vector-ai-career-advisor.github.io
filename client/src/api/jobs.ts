@@ -24,6 +24,11 @@ export interface JobFilters {
   keyword?: string
   seniority?: string
   location?: string
+  posted_date?: string
+  roles?: string[]
+  years_experience_min?: number
+  years_experience_max?: number
+  skills?: string[]
   limit?: number
   offset?: number
 }

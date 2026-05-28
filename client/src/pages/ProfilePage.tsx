@@ -15,6 +15,10 @@ export interface FilterPreset {
   keyword?: string
   seniority?: string
   location?: string
+  posted_date?: string
+  roles?: string[]
+  years_experience_min?: number
+  skills?: string[]
   createdAt: string
 }
 

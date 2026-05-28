@@ -11,7 +11,51 @@ import ProfilePage, { savePreset, loadPresets, FilterPreset } from './ProfilePag
 import ApplicationsPage from './ApplicationsPage'
 import './JobsPage.css'
 
-const SENIORITIES = ['', 'Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
+const SENIORITIES = ['Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
+const POSTED_DATE_OPTIONS = [
+  { value: '', label: 'Anytime' },
+  { value: 'last_24h', label: 'Last 24 hours' },
+  { value: 'last_3d', label: 'Last 3 days' },
+  { value: 'last_week', label: 'Last week' },
+  { value: 'last_2w', label: 'Last 2 weeks' },
+  { value: 'last_month', label: 'Last month' },
+]
+const YEARS_OF_EXP_OPTIONS = [
+  { value: '', label: 'Any experience' },
+  { value: 0, label: '0 years' },
+  { value: 1, label: '1+ years' },
+  { value: 2, label: '2+ years' },
+  { value: 3, label: '3+ years' },
+  { value: 5, label: '5+ years' },
+  { value: 10, label: '10+ years' },
+]
+const ROLE_OPTIONS = [
+  'Frontend',
+  'Backend',
+  'Fullstack',
+  'AI / ML',
+  'Data Scientist',
+  'Data Engineer',
+  'Data Analyst',
+  'DevOps / Cloud',
+  'Mobile',
+  'QA / Automation',
+  'Security',
+  'Embedded / Firmware',
+  'Solutions Architect',
+  'Team Lead',
+  'Software Development',
+  'Product Manager',
+  'Other',
+]
+const LOCATION_OPTIONS = [
+  'Center',
+  'Hashrom',
+  'South',
+  'North',
+  'Shfela',
+  'Remote',
+]
 const LIMIT = 50
 
 type Tab = 'jobs' | 'stats' | 'applications' | 'profile'
@@ -30,9 +74,16 @@ export default function JobsPage() {
   const [total, setTotal]         = useState(0)
 
   const [keyword, setKeyword]     = useState('')
-  const [seniority, setSeniority] = useState('')
-  const [location, setLocation]   = useState('')
+  const [seniorities, setSeniorities] = useState<string[]>([])
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
+  
+  // New filters
+  const [postedDate, setPostedDate] = useState('')
+  const [roles, setRoles] = useState<string[]>([])
+  const [yearsExp, setYearsExp] = useState<number | ''>('')
+  const [locations, setLocations] = useState<string[]>([])
+  const [skills, setSkills] = useState<string[]>([])
+  const [skillInput, setSkillInput] = useState('')
 
   // Save-filter UX
   const [showSaveModal, setShowSaveModal]   = useState(false)
@@ -58,8 +109,12 @@ export default function JobsPage() {
     try {
       const res = await fetchJobs({
         keyword:  debouncedKeyword || undefined,
-        seniority: seniority || undefined,
-        location: location || undefined,
+        seniority: seniorities.length > 0 ? seniorities.join(',') : undefined,
+        location: locations.length > 0 ? locations[0] : undefined,
+        posted_date: postedDate || undefined,
+        roles: roles.length > 0 ? roles : undefined,
+        years_experience_min: yearsExp !== '' ? yearsExp : undefined,
+        skills: skills.length > 0 ? skills : undefined,
         limit: LIMIT,
         offset: 0,
       })
@@ -72,7 +127,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedKeyword, seniority, location])
+  }, [debouncedKeyword, seniorities, locations, postedDate, roles, yearsExp, skills])
 
   useEffect(() => { load() }, [load])
 
@@ -82,8 +137,12 @@ export default function JobsPage() {
     try {
       const res = await fetchJobs({
         keyword:  debouncedKeyword || undefined,
-        seniority: seniority || undefined,
-        location: location || undefined,
+        seniority: seniorities.length > 0 ? seniorities.join(',') : undefined,
+        location: locations.length > 0 ? locations[0] : undefined,
+        posted_date: postedDate || undefined,
+        roles: roles.length > 0 ? roles : undefined,
+        years_experience_min: yearsExp !== '' ? yearsExp : undefined,
+        skills: skills.length > 0 ? skills : undefined,
         limit: LIMIT,
         offset,
       })
@@ -95,7 +154,7 @@ export default function JobsPage() {
     } catch { /* silent fail */ } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, offset, debouncedKeyword, seniority, location])
+  }, [loadingMore, hasMore, offset, debouncedKeyword, seniorities, locations, postedDate, roles, yearsExp, skills])
 
   useEffect(() => {
     const sentinel = sentinelRef.current
@@ -116,17 +175,26 @@ export default function JobsPage() {
 
   const clearFilters = () => {
     setKeyword('')
-    setSeniority('')
-    setLocation('')
+    setSeniorities([])
+    setPostedDate('')
+    setRoles([])
+    setYearsExp('')
+    setLocations([])
+    setSkills([])
+    setSkillInput('')
   }
 
-  const hasFilters = keyword || seniority || location
+  const hasFilters = keyword || seniorities.length > 0 || postedDate || roles.length > 0 || yearsExp !== '' || locations.length > 0 || skills.length > 0
 
   // Apply a saved preset from ProfilePage
   const handleApplyFilter = (filters: JobFilters) => {
     if (filters.keyword   !== undefined) setKeyword(filters.keyword ?? '')
-    if (filters.seniority !== undefined) setSeniority(filters.seniority ?? '')
-    if (filters.location  !== undefined) setLocation(filters.location ?? '')
+    if (filters.seniority !== undefined) setSeniorities(filters.seniority ? filters.seniority.split(',') : [])
+    if (filters.location  !== undefined) setLocations(filters.location ? [filters.location] : [])
+    if (filters.posted_date !== undefined) setPostedDate(filters.posted_date ?? '')
+    if (filters.roles !== undefined) setRoles(filters.roles ?? [])
+    if (filters.years_experience_min !== undefined) setYearsExp(filters.years_experience_min ?? '')
+    if (filters.skills !== undefined) setSkills(filters.skills ?? [])
     setActiveTab('jobs')
   }
 
@@ -136,8 +204,12 @@ export default function JobsPage() {
     savePreset({
       name: presetName.trim(),
       keyword:  keyword  || undefined,
-      seniority: seniority || undefined,
-      location: location || undefined,
+      seniority: seniorities.length > 0 ? seniorities.join(',') : undefined,
+      location: locations.length > 0 ? locations[0] : undefined,
+      posted_date: postedDate || undefined,
+      roles: roles.length > 0 ? roles : undefined,
+      years_experience_min: yearsExp !== '' ? yearsExp : undefined,
+      skills: skills.length > 0 ? skills : undefined,
     })
     setPresets(loadPresets())
     setPresetName('')
@@ -276,27 +348,180 @@ export default function JobsPage() {
 
                 <div className="filter-group">
                   <label className="filter-label">Location</label>
-                  <input
-                    type="text"
-                    placeholder="City or remote…"
-                    value={location}
-                    onChange={e => setLocation(e.target.value)}
-                    className="filter-input"
-                  />
+                  <div className="filter-tags-input">
+                    <div className="tags-display">
+                      {locations.map(location => (
+                        <span key={location} className="tag">
+                          {location}
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            onClick={() => setLocations(locations.filter(l => l !== location))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <select
+                      value=""
+                      onChange={e => {
+                        const loc = e.currentTarget.value
+                        if (loc && !locations.includes(loc)) {
+                          setLocations([...locations, loc])
+                          e.currentTarget.value = ''
+                        }
+                      }}
+                      className="filter-input"
+                    >
+                      <option value="">Add location…</option>
+                      {LOCATION_OPTIONS.map(loc => (
+                        <option key={loc} value={loc} disabled={locations.includes(loc)}>
+                          {loc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="filter-group">
                   <label className="filter-label">Seniority</label>
-                  <div className="seniority-chips">
-                    {SENIORITIES.map(s => (
-                      <button
-                        key={s}
-                        className={`chip ${seniority === s ? 'active' : ''}`}
-                        onClick={() => setSeniority(s)}
-                      >
-                        {s || 'All'}
-                      </button>
+                  <div className="filter-tags-input">
+                    <div className="tags-display">
+                      {seniorities.map(s => (
+                        <span key={s} className="tag">
+                          {s}
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            onClick={() => setSeniorities(seniorities.filter(x => x !== s))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <select
+                      value={""}
+                      onChange={e => {
+                        const s = e.currentTarget.value
+                        if (s && !seniorities.includes(s)) {
+                          setSeniorities([...seniorities, s])
+                          e.currentTarget.value = ''
+                        }
+                      }}
+                      className="filter-input"
+                    >
+                      <option value="">Add seniority…</option>
+                      {SENIORITIES.map(s => (
+                        <option key={s} value={s} disabled={seniorities.includes(s)}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Posted Date</label>
+                  <select
+                    value={postedDate}
+                    onChange={e => setPostedDate(e.target.value)}
+                    className="filter-input"
+                  >
+                    {POSTED_DATE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Role</label>
+                  <div className="filter-tags-input">
+                    <div className="tags-display">
+                      {roles.map(role => (
+                        <span key={role} className="tag">
+                          {role}
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            onClick={() => setRoles(roles.filter(r => r !== role))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <select
+                      value=""
+                      onChange={e => {
+                        const role = e.currentTarget.value
+                        if (role && !roles.includes(role)) {
+                          setRoles([...roles, role])
+                          e.currentTarget.value = ''
+                        }
+                      }}
+                      className="filter-input"
+                    >
+                      <option value="">Add role…</option>
+                      {ROLE_OPTIONS.map(role => (
+                        <option key={role} value={role} disabled={roles.includes(role)}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Years of Experience</label>
+                  <select
+                    value={yearsExp}
+                    onChange={e => setYearsExp(e.target.value === '' ? '' : parseInt(e.target.value))}
+                    className="filter-input"
+                  >
+                    {YEARS_OF_EXP_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-group">
+                  <label className="filter-label">Skills</label>
+                  <div className="filter-tags-input">
+                    <div className="tags-display">
+                      {skills.map(skill => (
+                        <span key={skill} className="tag">
+                          {skill}
+                          <button
+                            type="button"
+                            className="tag-remove"
+                            onClick={() => setSkills(skills.filter(s => s !== skill))}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Add skill (e.g. Python, React)…"
+                      value={skillInput}
+                      onChange={e => setSkillInput(e.target.value)}
+                      className="filter-input"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && skillInput.trim()) {
+                          if (!skills.includes(skillInput.trim())) {
+                            setSkills([...skills, skillInput.trim()])
+                          }
+                          setSkillInput('')
+                        }
+                      }}
+                    />
                   </div>
                 </div>
 
