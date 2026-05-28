@@ -28,6 +28,46 @@
   --radius-lg: 20px;
 }
 
+
+[data-theme="light"] {
+  --bg:        #f5f3ff;
+  --surface:   #ffffff;
+  --surface2:  #ede9fe;
+
+  --border:    #e2d9f3;
+  --border2:   #c4b5fd;
+
+  --text:      #1e1033;
+  --muted:     #7c3aed;
+
+  --accent:    #ec4899;
+  --accent2:   #7c3aed;
+}
+
+/* ── Navbar light mode fix ── */
+[data-theme="light"] .navbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-theme="light"] .nav-tab {
+  color: var(--muted);
+}
+
+[data-theme="light"] .nav-tab.active {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+[data-theme="light"] .logo-text,
+[data-theme="light"] .logo-icon {
+  color: var(--text);
+}
+
+[data-theme="light"] .btn-logout {
+  color: var(--text);
+  border-color: var(--border2);
+}
 html { font-size: 16px; scroll-behavior: smooth; }
 
 body {

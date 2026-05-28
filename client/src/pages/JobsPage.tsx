@@ -1,4 +1,4 @@
-// src/pages/JobsPage.tsx
+
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchJobs, Job, JobFilters } from '../api/jobs'
@@ -9,6 +9,7 @@ import AgentChat from '../components/AgentChat'
 import StatsPage from './StatsPage'
 import ProfilePage, { savePreset, loadPresets, FilterPreset } from './ProfilePage'
 import ApplicationsPage from './ApplicationsPage'
+import ThemeToggle from '../components/ThemeToggle'  
 import './JobsPage.css'
 
 const SENIORITIES = ['Junior', 'Mid', 'Senior', 'Lead', 'Staff', 'Principal']
@@ -77,7 +78,7 @@ export default function JobsPage() {
   const [seniorities, setSeniorities] = useState<string[]>([])
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
   
-  // New filters
+
   const [postedDate, setPostedDate] = useState('')
   const [roles, setRoles] = useState<string[]>([])
   const [yearsExp, setYearsExp] = useState<number | ''>('')
@@ -284,14 +285,18 @@ export default function JobsPage() {
             )}
           </button>
         </div>
-
-        <div className="navbar-right">
+  `
+          
+            <div className="navbar-right">
           {activeTab === 'jobs' && (
             <span className="jobs-count">{total} listings</span>
           )}
-          <button className="btn-logout" onClick={handleLogout}>Sign out</button>
+          <ThemeToggle />
+          <button className="btn-logout" onClick={handleLogout}>
+            Sign out
+          </button>
         </div>
-      </nav>
+      </nav>`
 
       {/* ── Statistics view ── */}
       {activeTab === 'stats' && (

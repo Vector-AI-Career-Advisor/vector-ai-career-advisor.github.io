@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import ThemeToggle from '../components/ThemeToggle' 
 import './AuthPage.css'
 
 export default function AuthPage() {
@@ -15,6 +16,7 @@ export default function AuthPage() {
 
   return (
     <div className="auth-root">
+      
       {/* Left panel */}
       <div className="auth-hero">
         <div className="auth-hero-content">
@@ -53,7 +55,12 @@ export default function AuthPage() {
       </div>
 
       {/* Right panel */}
+      
       <div className="auth-panel">
+        <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
+          <ThemeToggle />
+        </div>
+        
         <div className="auth-card">
           {/* Tab switcher */}
           <div className="auth-tabs">
