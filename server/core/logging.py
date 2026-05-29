@@ -11,8 +11,8 @@ def setup_logging() -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    logs_dir = Path("logs")
-    logs_dir.mkdir(exist_ok=True)
+    logs_dir = Path(__file__).parent.parent / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / f"error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     # delay=True: file is only created on first write (when an error triggers a flush)
