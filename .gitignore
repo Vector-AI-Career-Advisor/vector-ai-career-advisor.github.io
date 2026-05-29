@@ -55,3 +55,4 @@ server/logs/
 airflow.db
 airflow.cfg
 airflow-webserver.pid
+/tree.txt
