@@ -3,9 +3,6 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Resolve paths relative to server/ so relative .env values (e.g. "./chroma_db")
-# always land inside server/ regardless of the process working directory.
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 

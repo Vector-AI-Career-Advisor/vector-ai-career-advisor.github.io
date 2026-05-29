@@ -114,15 +114,8 @@ export default function StatsPage() {
   return (
     <div className="stats-root">
 
-      {/* ── Summary strip ── */}
-      <div className="stats-summary">
-        <SummaryCard label="Total Listings"   value={summary.total_jobs.toLocaleString()}       sub="across all sources" />
-        <SummaryCard label="Companies Hiring" value={summary.total_companies.toLocaleString()}  sub="unique employers" />
-        <SummaryCard label="Locations"        value={summary.total_locations.toLocaleString()}  sub="cities & remote" />
-        <SummaryCard label="Unique Skills"    value={summary.total_skills.toLocaleString()}     sub="tracked technologies" />
-      </div>
 
-      {/* ── Jobs per day ── */}
+      {/* graph of job post per day
       <div className="stats-section">
         <div className="stats-section-header">
           <span className="stats-section-title">Listings Over Time</span>
@@ -145,7 +138,7 @@ export default function StatsPage() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </div>*/}
 
       {/* ── Two-column: companies + locations ── */}
       <div className="stats-grid-2">
