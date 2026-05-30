@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import date
 from typing import Annotated, TypedDict
 
@@ -19,15 +20,21 @@ from .job_advisor_agent import run_job_advisor_agent
 from .prompts import ORCHESTRATOR_PROMPT
 
 load_dotenv()
+sys.dont_write_bytecode = True
 
-# ── Tool wrappers around each specialist agent ────────────────────────────
+# ── Tool wrappers with Debug Printing ─────────────────────────────────────
 
 @tool
 def sql_agent(query: str) -> str:
     """Delegate to the SQL Agent for any job database queries.
     Use for: job searches, statistics, skill trends, company rankings, listings.
+    Do NOT use for course or learning recommendations.
     Pass the user's full request as `query`.
     """
+    print("\n" + "="*60)
+    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: SQL_AGENT")
+    print(f"📝 [PAYLOAD] -> {query!r}")
+    print("="*60 + "\n")
     return run_sql_agent(query)
 
 
@@ -37,15 +44,24 @@ def resume_agent(query: str) -> str:
     Use for: tailoring a resume to a job, uploading a resume, gap analysis.
     Pass the user's full request (including any job IDs) as `query`.
     """
+    print("\n" + "="*60)
+    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: RESUME_AGENT")
+    print(f"📝 [PAYLOAD] -> {query!r}")
+    print("="*60 + "\n")
     return run_resume_agent(query)
 
 
 @tool
 def job_advisor_agent(query: str) -> str:
-    """Delegate to the Job Advisor Agent for coaching about a specific job posting.
-    Use for: interview prep, salary negotiation, role fit, application strategy.
-    Pass the user's full request (including any job IDs) as `query`.
+    """Delegate to the Job Advisor Agent for career coaching and upskilling advice.
+    Use for: interview prep, salary negotiation, role fit, application strategy, 
+    and ANY requests for course recommendations, tutorials, study plans, or learning paths (e.g., AWS, backend).
+    Pass the user's full request verbatim as `query`.
     """
+    print("\n" + "="*60)
+    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: JOB_ADVISOR_AGENT")
+    print(f"📝 [PAYLOAD] -> {query!r}")
+    print("="*60 + "\n")
     return run_job_advisor_agent(query)
 
 
@@ -62,13 +78,18 @@ def build_orchestrator():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-        temperature=0,
     ).bind_tools(ORCHESTRATOR_TOOLS)
 
     def coordinator(state: State):
         prompt = ORCHESTRATOR_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
-        return {"messages": [llm.invoke(messages)]}
+        try:
+            response = llm.invoke(messages)
+            return {"messages": [response]}
+        except Exception as e:
+            print("LLM ERROR:", e)
+            raise
+        
 
     def route(state: State):
         last = state["messages"][-1]

@@ -622,7 +622,7 @@ export default function JobsPage() {
           <div className="modal-jobs">
             <h3 className="modal-title-jobs">Name this filter preset</h3>
             <p className="modal-sub-jobs">
-              {[keyword, seniority, location].filter(Boolean).join(' · ')}
+              {[keyword, seniorities.length > 0 ? seniorities.join(', ') : '', locations.length > 0 ? locations[0] : ''].filter(Boolean).join(' · ')}
             </p>
             <input
               className="modal-input-jobs"

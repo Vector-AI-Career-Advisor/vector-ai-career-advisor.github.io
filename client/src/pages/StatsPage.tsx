@@ -222,7 +222,7 @@ export default function StatsPage() {
                     if (!active || !payload?.length) return null
                     const { name, value } = payload[0]
                     const total = by_seniority.reduce((s, r) => s + r.count, 0)
-                    const pct   = total ? ((value / total) * 100).toFixed(1) : 0
+                    const pct   = total && value !== undefined ? ((Number(value) / total) * 100).toFixed(1) : 0
                     return (
                       <div className="chart-tooltip">
                         <div className="chart-tooltip-label">{name}</div>

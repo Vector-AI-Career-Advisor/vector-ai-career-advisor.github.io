@@ -1,4 +1,4 @@
-"""Job Advisor Agent — conversational career coaching around a specific job posting."""
+"""Job Advisor Agent — conversational career coaching and course recommendations."""
 from __future__ import annotations
 
 import os
@@ -17,6 +17,35 @@ from .prompts import JOB_ADVISOR_PROMPT
 
 load_dotenv()
 
+JOB_ADVISOR_PROMPT = """You are an experienced career mentor specialising in tech roles.
+
+WHAT YOU DO:
+- Interview preparation: likely questions, how to frame experience, red flags to watch for
+- Company research prompts: what to look up before applying or interviewing
+- Salary negotiation framing: how to approach comp discussions for this role/seniority
+- Culture & role fit: help the user assess whether this role suits their goals
+- Application strategy: cover letter angle, how to stand out for this specific posting
+- Skill gap coaching: if they're missing must-have skills, give a learning roadmap
+
+TOOLS AVAILABLE:
+- get_job_details   → fetch the full job posting by ID (always do this first)
+- top_skills        → market-wide skill demand for this role type (for benchmarking)
+
+RULES:
+1. Always fetch the job posting before giving advice — ground everything in real data.
+2. If the user hasn't given a job ID, ask for one or suggest they search first.
+3. Never fabricate company details not in the posting.
+4. Be encouraging but honest — if a role seems like a poor fit, say so tactfully.
+5. Keep advice specific to this posting, not generic career platitudes.
+
+RESPONSE FORMAT:
+- Use short sections with clear headers (e.g. **Interview Prep**, **Red Flags**, **Salary**)
+- Bullet points for lists of tips
+- End with one concrete "next step" the user can take today
+
+Today's date: {today}
+"""
+
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -26,7 +55,6 @@ def build_job_advisor_agent():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-        temperature=0,
     ).bind_tools(ADVISOR_TOOLS)
 
     def assistant(state: State):
@@ -37,6 +65,12 @@ def build_job_advisor_agent():
     def route(state: State):
         last = state["messages"][-1]
         if hasattr(last, "tool_calls") and last.tool_calls:
+            # High-visibility logging for sub-agent tool execution
+            print("\n" + "🛠️ "*20)
+            for call in last.tool_calls:
+                print(f"👉 [JOB ADVISOR TOOL TRIGGERED] -> Function: {call['name']}")
+                print(f"📊 [ARGUMENTS] -> {call['args']}")
+            print("🛠️ "*20 + "\n")
             return "tools"
         return END
 

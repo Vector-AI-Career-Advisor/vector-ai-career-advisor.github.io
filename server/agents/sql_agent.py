@@ -25,7 +25,6 @@ def build_sql_agent():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-        temperature=0,
     ).bind_tools(DB_TOOLS)
 
     def assistant(state: State):

@@ -26,7 +26,6 @@ def build_resume_agent():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-        temperature=0,
     ).bind_tools(RESUME_TOOLS)
 
     def assistant(state: State):
