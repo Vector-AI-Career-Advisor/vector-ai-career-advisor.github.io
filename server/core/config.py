@@ -24,6 +24,12 @@ SECRET_KEY                  = os.getenv("SECRET_KEY", "change-me-in-production")
 ALGORITHM                   = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
 
+# ── OAuth providers ───────────────────────────────────────────────────────────   
+GOOGLE_CLIENT_ID       = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET   = os.getenv("GOOGLE_CLIENT_SECRET", "")
+LINKEDIN_CLIENT_ID     = os.getenv("LINKEDIN_CLIENT_ID", "")
+LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
+
 # ── ChromaDB ──────────────────────────────────────────────────────────────────
 CHROMA_PERSIST_DIR = _resolve(os.getenv("CHROMA_DIR", "chroma_db"))
 CHROMA_COLLECTION  = os.getenv("CHROMA_COLLECTION")

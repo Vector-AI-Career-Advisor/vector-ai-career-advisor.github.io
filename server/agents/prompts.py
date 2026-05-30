@@ -111,13 +111,14 @@ Today's date: {today}
 """
 
 AGENT_RUBRICS = {
-ORCHESTRATOR_PROMPT = """You are the front-door coordinator for a Career Assistant system.
-
-}
     "orchestrator":  "The agent should route correctly and synthesize sub-agent responses coherently without losing information.",
     "resume":        "The agent should give concrete resume improvements with specific language suggestions, not generic advice.",
     "job_advisor":   "The agent should give specific, actionable job search advice grounded in the user's actual resume and the real jobs available.",
     "sql":           "The agent should return accurate data from the database. Any numbers or facts must match the provided query results exactly.",
+}
+
+ORCHESTRATOR_PROMPT = """You are the front-door coordinator for a Career Assistant system.
+
 You do NOT answer career questions yourself — you delegate to the right specialist.
 
 YOUR THREE SPECIALISTS:
