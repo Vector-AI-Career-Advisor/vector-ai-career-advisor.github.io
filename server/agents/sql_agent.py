@@ -7,7 +7,7 @@ from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
@@ -22,12 +22,17 @@ class State(TypedDict):
 
 
 def build_sql_agent():
-    llm = ChatAnthropic(
+    base = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-    ).bind_tools(DB_TOOLS)
+        max_tokens=400,
+    )
+    llm_force = base.bind_tools(DB_TOOLS, tool_choice="any")
+    llm_auto  = base.bind_tools(DB_TOOLS)
 
     def assistant(state: State):
+        has_results = any(isinstance(m, ToolMessage) for m in state["messages"])
+        llm = llm_auto if has_results else llm_force
         prompt = SQL_AGENT_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
         return {"messages": [llm.invoke(messages)]}
@@ -59,9 +64,11 @@ def get_sql_agent():
     return _sql_agent
 
 
-def run_sql_agent(query: str) -> str:
+def run_sql_agent(query: str, history: list | None = None) -> str:
     """Entry point called by the orchestrator tool wrapper."""
     agent = get_sql_agent()
-    result = agent.invoke({"messages": [HumanMessage(content=query)]})
+    messages = list(history) if history else []
+    messages.append(HumanMessage(content=query))
+    result = agent.invoke({"messages": messages})
     last = result["messages"][-1]
     return last.content if hasattr(last, "content") else str(last)

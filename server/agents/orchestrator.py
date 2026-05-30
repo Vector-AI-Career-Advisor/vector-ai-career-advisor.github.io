@@ -5,6 +5,7 @@ import logging
 import os
 import threading
 import sys
+from contextvars import ContextVar
 from datetime import date
 from typing import Annotated, TypedDict
 
@@ -28,42 +29,72 @@ sys.dont_write_bytecode = True
 
 log = logging.getLogger(__name__)
 
+# Stores the conversation history for the current request so tool wrappers
+# and the evaluator can access it without threading it through every call.
+# Set by router.py before each agent.invoke(); reset in a finally block.
+conversation_history: ContextVar[list] = ContextVar("conversation_history", default=[])
 
-# ── Background evaluation ─────────────────────────────────────────────────
 
-def _evaluate_in_background(agent_type: AgentType, query: str, response: str) -> None:
-    try:
-        result = run_evaluator_agent(EvaluationInput(
-            agent_type=agent_type,
-            user_message=query,
-            agent_response=response,
-            context={},
-        ))
-        conn = get_connection()
+# ── Evaluation helpers ────────────────────────────────────────────────────
+
+def _save_evaluation_bg(
+    agent_type: AgentType, query: str, response: str, result
+) -> None:
+    """Persist an EvaluationResult to the DB in a background thread."""
+    def _save():
         try:
-            insert_evaluation(
-                conn,
-                agent_type=agent_type.value,
-                user_message=query,
-                agent_response=response,
-                score=result.score,
-                passed=result.passed,
-                dimensions=result.dimensions,
-                critique=result.critique,
-                suggested_response=result.suggested_response,
-            )
-        finally:
-            conn.close()
-    except Exception:
-        log.exception("Background evaluation failed for agent '%s'.", agent_type.value)
+            conn = get_connection()
+            try:
+                insert_evaluation(
+                    conn,
+                    agent_type=agent_type.value,
+                    user_message=query,
+                    agent_response=response,
+                    score=result.score,
+                    passed=result.passed,
+                    dimensions=result.dimensions,
+                    critique=result.critique,
+                    suggested_response=result.suggested_response,
+                )
+            finally:
+                conn.close()
+        except Exception:
+            log.exception("Failed to save evaluation for agent '%s'.", agent_type.value)
+
+    threading.Thread(target=_save, daemon=True).start()
+
+
+def _build_eval_context(history: list) -> dict:
+    """Serialise LangChain messages into a plain dict for the evaluator."""
+    if not history:
+        return {}
+    return {
+        "conversation_history": [
+            {"role": "user" if isinstance(m, HumanMessage) else "agent", "text": m.content}
+            for m in history
+            if hasattr(m, "content")
+        ]
+    }
 
 
 def _fire_evaluation(agent_type: AgentType, query: str, response: str) -> None:
-    threading.Thread(
-        target=_evaluate_in_background,
-        args=(agent_type, query, response),
-        daemon=True,
-    ).start()
+    """Fire-and-forget: evaluate and save to DB in a background thread."""
+    history = conversation_history.get([])
+    context = _build_eval_context(history)
+
+    def _run():
+        try:
+            result = run_evaluator_agent(EvaluationInput(
+                agent_type=agent_type,
+                user_message=query,
+                agent_response=response,
+                context=context,
+            ))
+            _save_evaluation_bg(agent_type, query, response, result)
+        except Exception:
+            log.exception("[EVALUATOR] Background evaluation failed for '%s'.", agent_type.value)
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 # ── Tool wrappers around each specialist agent ────────────────────────────
@@ -75,7 +106,8 @@ def sql_agent(query: str) -> str:
     Do NOT use for course or learning recommendations.
     Pass the user's full request as `query`.
     """
-    response = run_sql_agent(query)
+    history = conversation_history.get([])
+    response = run_sql_agent(query, history=history)
     _fire_evaluation(AgentType.SQL, query, response)
     return response
 
@@ -86,7 +118,8 @@ def resume_agent(query: str) -> str:
     Use for: tailoring a resume to a job, uploading a resume, gap analysis.
     Pass the user's full request (including any job IDs) as `query`.
     """
-    response = run_resume_agent(query)
+    history = conversation_history.get([])
+    response = run_resume_agent(query, history=history)
     _fire_evaluation(AgentType.RESUME, query, response)
     return response
 
@@ -94,11 +127,12 @@ def resume_agent(query: str) -> str:
 @tool
 def job_advisor_agent(query: str) -> str:
     """Delegate to the Job Advisor Agent for career coaching and upskilling advice.
-    Use for: interview prep, salary negotiation, role fit, application strategy, 
-    and ANY requests for course recommendations, tutorials, study plans, or learning paths (e.g., AWS, backend).
+    Use for: interview prep, salary negotiation, role fit, application strategy,
+    and ANY requests for course recommendations, tutorials, study plans, or learning paths.
     Pass the user's full request verbatim as `query`.
     """
-    response = run_job_advisor_agent(query)
+    history = conversation_history.get([])
+    response = run_job_advisor_agent(query, history=history)
     _fire_evaluation(AgentType.JOB_ADVISOR, query, response)
     return response
 
@@ -140,6 +174,6 @@ def build_orchestrator():
     graph.add_node("tools", ToolNode(ORCHESTRATOR_TOOLS))
     graph.set_entry_point("coordinator")
     graph.add_conditional_edges("coordinator", route, {"tools": "tools", END: END})
-    graph.add_edge("tools", "coordinator")
+    graph.add_edge("tools", END)
 
     return graph.compile()

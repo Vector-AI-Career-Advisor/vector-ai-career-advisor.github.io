@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { Job } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
 import api from '../api/client'
@@ -13,7 +14,15 @@ interface Message {
   role: Role
   text: string
   timestamp: Date
+  agentsUsed?: string[]
 }
+
+const AGENT_LABELS: Record<string, string> = {
+  sql_agent:         'Job Search',
+  resume_agent:      'Resume',
+  job_advisor_agent: 'Career Advisor',
+}
+const agentLabel = (name: string) => AGENT_LABELS[name] ?? name
 
 interface Props {
   selectedJob: Job | null
@@ -24,7 +33,7 @@ async function callAgent(
   message: string,
   selectedJob: Job | null,
   history: Message[]
-): Promise<string> {
+): Promise<{ reply: string; agentsUsed: string[] }> {
   const { data } = await api.post('/agents/chat', {
     message,
     job_id: selectedJob?.id ?? null,
@@ -32,7 +41,7 @@ async function callAgent(
       .filter(m => m.role === 'user' || m.role === 'agent')
       .map(m => ({ role: m.role, text: m.text })),
   })
-  return data.reply
+  return { reply: data.reply, agentsUsed: data.agents_used ?? [] }
 }
 
 // ─── Suggested prompts ───────────────────────────────────────────────────────
@@ -107,10 +116,10 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     setError(null)
 
     try {
-      const reply = await callAgent(trimmed, selectedJob, messages)
+      const { reply, agentsUsed } = await callAgent(trimmed, selectedJob, messages)
       setMessages(prev => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date() },
+        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed },
       ])
     } catch {
       setError('Failed to reach the agents. Please try again.')
@@ -218,16 +227,29 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
               <div key={msg.id} className={`message-row ${msg.role}`}>
                 {msg.role === 'system' ? (
                   <div className="system-message">{msg.text}</div>
+                ) : msg.role === 'agent' ? (
+                  <div className="message-content">
+                    {msg.agentsUsed && msg.agentsUsed.length > 0 && (
+                      <div className="routing-trace">
+                        <span className="routing-trace-via">via</span>
+                        {msg.agentsUsed.map(a => (
+                          <span key={a} className="routing-chip">{agentLabel(a)}</span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="bubble agent">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <span className="msg-time">
+                        {msg.timestamp.toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
                 ) : (
-                  <div className={`bubble ${msg.role}`}>
-                    <span
-                      dangerouslySetInnerHTML={{
-                        __html: msg.text
-                          .replace(/&/g, '&amp;')
-                          .replace(/</g, '&lt;')
-                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'),
-                      }}
-                    />
+                  <div className="bubble user">
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
                     <span className="msg-time">
                       {msg.timestamp.toLocaleTimeString([], {
                         hour: '2-digit',
@@ -243,6 +265,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
               <div className="message-row agent">
                 <div className="bubble agent typing-indicator">
                   <span /><span /><span />
+                  <span className="routing-label">Routing…</span>
                 </div>
               </div>
             )}

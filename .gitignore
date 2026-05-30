@@ -56,3 +56,5 @@ airflow.db
 airflow.cfg
 airflow-webserver.pid
 /tree.txt
+
+server/agents/tailored_resumes/

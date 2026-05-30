@@ -4,10 +4,10 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage
 
 from core.security import get_current_user
-from agents.orchestrator import build_orchestrator
+from agents.orchestrator import build_orchestrator, conversation_history
 from agents.tools.resume_tools import set_current_user
 
 log = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    agents_used: List[str] = []
 
 
 # ── Endpoint ───────────────────────────────────────────────────────────────
@@ -61,11 +62,25 @@ def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
 
     lc_history.append(HumanMessage(content=message))
 
+    # Expose prior turns (everything except the current message) to sub-agents
+    # and the evaluator via a per-request context variable.
+    token = conversation_history.set(lc_history[:-1])
     try:
         result = agent.invoke({"messages": lc_history})
-        reply = result["messages"][-1].content
+        last: BaseMessage = result["messages"][-1]
+        reply = last.content if hasattr(last, "content") else str(last)
     except Exception:
         log.exception("Agent invocation failed for user %s", user_id)
         raise HTTPException(status_code=500, detail="Agent failed to process the request")
+    finally:
+        conversation_history.reset(token)
 
-    return ChatResponse(reply=reply)
+    agents_used: List[str] = []
+    for msg in result["messages"]:
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            for tc in msg.tool_calls:
+                name = tc.get("name", "")
+                if name and name not in agents_used:
+                    agents_used.append(name)
+
+    return ChatResponse(reply=reply, agents_used=agents_used)

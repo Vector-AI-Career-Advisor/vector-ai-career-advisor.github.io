@@ -76,11 +76,12 @@ def get_job_details(job_ids: list[str]):
 def get_job_aggregate(operation: str, column: str, role_filter: Optional[str] = None):
     """Calculate COUNT, AVG, MIN, or MAX statistics on job data.
     - operation: one of ['COUNT', 'AVG', 'MIN', 'MAX']
-    - column: one of ['yearsexperience', 'posted_at']
+    - column: use '*' for total row counts (e.g. COUNT(*)); or one of ['id', 'yearsexperience', 'posted_at', 'scraped_at']
+      IMPORTANT: always use column='*' or column='id' when counting total listings — never column='yearsexperience' for counts, as that column has NULLs and will undercount.
     - role_filter: optional role name to filter (e.g. 'data scientist')
     """
     ALLOWED_OPS = {"COUNT", "AVG", "MIN", "MAX"}
-    ALLOWED_COLUMNS = {"yearsexperience", "posted_at", "scraped_at", "id"}
+    ALLOWED_COLUMNS = {"*", "yearsexperience", "posted_at", "scraped_at", "id"}
 
     op_upper = operation.upper()
     col_lower = column.lower()
@@ -89,6 +90,8 @@ def get_job_aggregate(operation: str, column: str, role_filter: Optional[str] = 
         return {"error": f"Operation '{operation}' not allowed. Use COUNT, AVG, MIN, or MAX."}
     if col_lower not in ALLOWED_COLUMNS:
         return {"error": f"Column '{column}' not allowed for calculations."}
+    if col_lower == "*" and op_upper != "COUNT":
+        return {"error": "column='*' is only valid with COUNT."}
 
     sql = f"SELECT {op_upper}({col_lower}) AS result FROM jobs WHERE 1=1"
     params = []
@@ -134,8 +137,8 @@ def search_jobs_by_criteria(
 ):
     """Filter jobs by specific fields.
     - role: e.g. 'server', 'react developer'
-    - location: e.g. 'Tel Aviv', 'remote'
-    - company: e.g. 'Google', 'startup'
+    - location: e.g. 'Tel Aviv', 'remote' — ONLY use when the user explicitly names a city, country, or region (e.g. 'in Tel Aviv', 'remote jobs'). Do NOT use for company names.
+    - company: e.g. 'Google', 'startup' — use when the user names a company or employer (e.g. 'at Google', 'jobs at Abra'). When in doubt between location and company, prefer company.
     - max_experience: maximum years of experience required
     """
     sql = "SELECT id, title, company, role, location, url FROM jobs"
