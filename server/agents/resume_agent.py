@@ -25,7 +25,7 @@ class State(TypedDict):
 def build_resume_agent():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
-        model="claude-haiku-4-5",
+        model=os.getenv("ANTHROPIC_MODEL"),
         temperature=0,
     ).bind_tools(RESUME_TOOLS)
 
