@@ -1,7 +1,9 @@
 """Orchestrator Agent — classifies intent and delegates to specialist agents via tool wrappers."""
 from __future__ import annotations
 
+import logging
 import os
+import threading
 import sys
 from datetime import date
 from typing import Annotated, TypedDict
@@ -17,12 +19,54 @@ from langgraph.prebuilt import ToolNode
 from .sql_agent import run_sql_agent
 from .resume_agent import run_resume_agent
 from .job_advisor_agent import run_job_advisor_agent
+from .evaluator_agent import run_evaluator_agent, EvaluationInput, AgentType
 from .prompts import ORCHESTRATOR_PROMPT
+from db.postgres import get_connection, insert_evaluation
 
 load_dotenv()
 sys.dont_write_bytecode = True
 
-# ── Tool wrappers with Debug Printing ─────────────────────────────────────
+log = logging.getLogger(__name__)
+
+
+# ── Background evaluation ─────────────────────────────────────────────────
+
+def _evaluate_in_background(agent_type: AgentType, query: str, response: str) -> None:
+    try:
+        result = run_evaluator_agent(EvaluationInput(
+            agent_type=agent_type,
+            user_message=query,
+            agent_response=response,
+            context={},
+        ))
+        conn = get_connection()
+        try:
+            insert_evaluation(
+                conn,
+                agent_type=agent_type.value,
+                user_message=query,
+                agent_response=response,
+                score=result.score,
+                passed=result.passed,
+                dimensions=result.dimensions,
+                critique=result.critique,
+                suggested_response=result.suggested_response,
+            )
+        finally:
+            conn.close()
+    except Exception:
+        log.exception("Background evaluation failed for agent '%s'.", agent_type.value)
+
+
+def _fire_evaluation(agent_type: AgentType, query: str, response: str) -> None:
+    threading.Thread(
+        target=_evaluate_in_background,
+        args=(agent_type, query, response),
+        daemon=True,
+    ).start()
+
+
+# ── Tool wrappers around each specialist agent ────────────────────────────
 
 @tool
 def sql_agent(query: str) -> str:
@@ -31,11 +75,9 @@ def sql_agent(query: str) -> str:
     Do NOT use for course or learning recommendations.
     Pass the user's full request as `query`.
     """
-    print("\n" + "="*60)
-    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: SQL_AGENT")
-    print(f"📝 [PAYLOAD] -> {query!r}")
-    print("="*60 + "\n")
-    return run_sql_agent(query)
+    response = run_sql_agent(query)
+    _fire_evaluation(AgentType.SQL, query, response)
+    return response
 
 
 @tool
@@ -44,11 +86,9 @@ def resume_agent(query: str) -> str:
     Use for: tailoring a resume to a job, uploading a resume, gap analysis.
     Pass the user's full request (including any job IDs) as `query`.
     """
-    print("\n" + "="*60)
-    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: RESUME_AGENT")
-    print(f"📝 [PAYLOAD] -> {query!r}")
-    print("="*60 + "\n")
-    return run_resume_agent(query)
+    response = run_resume_agent(query)
+    _fire_evaluation(AgentType.RESUME, query, response)
+    return response
 
 
 @tool
@@ -58,11 +98,9 @@ def job_advisor_agent(query: str) -> str:
     and ANY requests for course recommendations, tutorials, study plans, or learning paths (e.g., AWS, backend).
     Pass the user's full request verbatim as `query`.
     """
-    print("\n" + "="*60)
-    print(f"🎯 [ORCHESTRATOR CHOICE] -> Routed to: JOB_ADVISOR_AGENT")
-    print(f"📝 [PAYLOAD] -> {query!r}")
-    print("="*60 + "\n")
-    return run_job_advisor_agent(query)
+    response = run_job_advisor_agent(query)
+    _fire_evaluation(AgentType.JOB_ADVISOR, query, response)
+    return response
 
 
 ORCHESTRATOR_TOOLS = [sql_agent, resume_agent, job_advisor_agent]

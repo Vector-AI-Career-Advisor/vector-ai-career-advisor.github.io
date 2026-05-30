@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import logging
 from datetime import date
 from typing import List, Optional
@@ -69,6 +70,24 @@ def init_db(conn=None) -> None:
             cur.execute("CREATE INDEX IF NOT EXISTS jobs_keyword_idx ON jobs (keyword);")
             cur.execute("CREATE INDEX IF NOT EXISTS jobs_role_idx ON jobs (role);")
             cur.execute("CREATE INDEX IF NOT EXISTS jobs_seniority_idx ON jobs (seniority);")
+
+            # ── Agent evaluations ─────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agent_evaluations (
+                    id                 SERIAL PRIMARY KEY,
+                    agent_type         TEXT    NOT NULL,
+                    score              INTEGER NOT NULL,
+                    passed             BOOLEAN NOT NULL,
+                    dimensions         JSONB,
+                    critique           TEXT,
+                    suggested_response TEXT,
+                    user_message       TEXT,
+                    agent_response     TEXT,
+                    evaluated_at       TIMESTAMP DEFAULT NOW()
+                );
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS evals_agent_type_idx ON agent_evaluations (agent_type);")
+            cur.execute("CREATE INDEX IF NOT EXISTS evals_evaluated_at_idx ON agent_evaluations (evaluated_at);")
 
             # ── Applications ──────────────────────────────────────────────────
             cur.execute("""
@@ -343,6 +362,37 @@ def fetch_jobs_by_ids(conn, ids: List[str]) -> List[dict]:
         """, (ids,))
         cols = [desc[0] for desc in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def insert_evaluation(
+    conn,
+    agent_type: str,
+    user_message: str,
+    agent_response: str,
+    score: int,
+    passed: bool,
+    dimensions: dict,
+    critique: str,
+    suggested_response: str,
+) -> int:
+    """Insert one agent evaluation row. Returns the new row id."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO agent_evaluations
+                (agent_type, score, passed, dimensions, critique,
+                 suggested_response, user_message, agent_response)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (
+            agent_type, score, passed,
+            json.dumps(dimensions),
+            critique, suggested_response,
+            user_message, agent_response,
+        ))
+        row_id = cur.fetchone()[0]
+    conn.commit()
+    log.debug("Evaluation saved (id=%d, agent=%s, score=%d).", row_id, agent_type, score)
+    return row_id
 
 
 def fetch_jobs_missing_from_chroma(conn, chroma_job_ids: set) -> List[dict]:

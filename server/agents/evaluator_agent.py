@@ -107,7 +107,12 @@ def run_evaluator_agent(evaluation_input: EvaluationInput) -> EvaluationResult:
 
     agent = get_evaluator_agent()
     result = agent.invoke({"messages": [HumanMessage(content=query)]})
-    raw = result["messages"][-1].content
+    raw = result["messages"][-1].content.strip()
+
+    # Strip markdown code fences if the model added them despite instructions
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1]
+        raw = raw.rsplit("```", 1)[0].strip()
 
     data = json.loads(raw)
     return EvaluationResult(
