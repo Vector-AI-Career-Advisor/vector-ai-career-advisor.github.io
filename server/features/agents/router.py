@@ -14,11 +14,47 @@ from server.core.security import get_current_user
 from server.core.logging import set_session_user, clear_session_user
 from server.agents.orchestrator import build_orchestrator, conversation_history
 from server.agents.tools.resume_tools import set_current_user
+from server.agents.evaluator_agent import run_evaluator_agent, EvaluationInput
+from server.db.postgres import get_connection, insert_evaluation
 
 # Use the "agents" namespace so this module's logs flow into the session log file.
 log = logging.getLogger("agents.router")
 
 router = APIRouter()
+
+
+# ── Evaluation ────────────────────────────────────────────────────────────
+
+def _fire_orchestrator_evaluation(user_message: str, final_reply: str, agents_used: List[str]) -> None:
+    """Evaluate the orchestrator's full response in a background thread.
+    ContextVar is copied at thread start so the session log is inherited."""
+    def _run():
+        try:
+            result = run_evaluator_agent(EvaluationInput(
+                user_message=user_message,
+                final_response=final_reply,
+                agents_used=agents_used,
+            ))
+            conn = get_connection()
+            try:
+                insert_evaluation(
+                    conn,
+                    agent_type="orchestrator",
+                    user_message=user_message,
+                    agent_response=final_reply,
+                    score=result.score,
+                    passed=result.passed,
+                    dimensions=result.dimensions,
+                    critique=result.critique,
+                    suggested_response=result.suggested_response,
+                )
+            finally:
+                conn.close()
+        except Exception:
+            log.exception("[EVALUATOR] Orchestrator evaluation failed")
+
+    threading.Thread(target=_run, daemon=True).start()
+
 
 # ── Orchestrator singleton ─────────────────────────────────────────────────
 
@@ -111,6 +147,8 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                     queue.put_nowait,
                     f"data: {json.dumps({'type': 'reply', 'reply': final_reply, 'agents_used': agents_used})}\n\n",
                 )
+                if final_reply:
+                    _fire_orchestrator_evaluation(req.message, final_reply, agents_used)
             except Exception:
                 log.exception("Agent streaming failed for user %s", user_id)
                 loop.call_soon_threadsafe(

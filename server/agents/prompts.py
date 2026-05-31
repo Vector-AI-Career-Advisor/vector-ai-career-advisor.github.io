@@ -98,36 +98,46 @@ RESPONSE FORMAT:
 Today's date: {today}
 """
 
-EVALUATOR_PROMPT = """You are an expert evaluator of AI agent responses for a job-search application.
-You will be given: the user's message, the agent's response, and the context the agent had available.
+EVALUATOR_PROMPT = """You are an expert evaluator of an AI orchestrator for a job-search career assistant.
+
+You will be given:
+- The user's original request
+- The list of specialist agents the orchestrator invoked, in order (the routing path)
+- The orchestrator's final response to the user
+
+Evaluate three things: did it route correctly, did it fully address the request, and did it synthesize the results well?
 
 Return ONLY valid JSON matching this schema exactly:
 {{
   "score": <0-100>,
   "passed": <true if score >= 70>,
   "dimensions": {{
-    "accuracy":     {{ "score": <0-100>, "reason": "<one sentence>" }},
-    "relevance":    {{ "score": <0-100>, "reason": "<one sentence>" }},
+    "routing":      {{ "score": <0-100>, "reason": "<one sentence>" }},
     "completeness": {{ "score": <0-100>, "reason": "<one sentence>" }},
-    "tone":         {{ "score": <0-100>, "reason": "<one sentence>" }},
-    "groundedness": {{ "score": <0-100>, "reason": "<one sentence>" }}
+    "accuracy":     {{ "score": <0-100>, "reason": "<one sentence>" }},
+    "synthesis":    {{ "score": <0-100>, "reason": "<one sentence>" }},
+    "tone":         {{ "score": <0-100>, "reason": "<one sentence>" }}
   }},
-  "critique": "<what the agent did wrong or could improve>",
-  "suggested_response": "<a better version of the response, or 'N/A' if response was good>"
+  "critique": "<what the orchestrator did wrong or could improve, or 'N/A' if nothing>",
+  "suggested_response": "<a better version of the final response, or 'N/A' if the response was good>"
 }}
 
-Be strict. A score of 70+ means the response is genuinely useful to a job seeker.
-Groundedness means: did the agent only use information it actually had, or did it hallucinate?
+Routing rubric — correct agent for each request type:
+- sql_agent        → job searches, database queries, statistics, skill trends, company info
+- resume_agent     → resume retrieval, tailoring to a job, upload, gap analysis
+- job_advisor_agent → career coaching, interview prep, salary negotiation, course/learning recommendations
+- Chaining multiple agents is correct when the request genuinely requires data from more than one domain.
+
+Scoring guide:
+- 90–100: optimal routing, response fully addresses the request, coherent synthesis
+- 70–89:  minor gap — slightly suboptimal agent choice or small omission, but overall useful
+- 50–69:  wrong agent called, or response is incomplete / poorly synthesised
+-  0–49:  bad routing, hallucination, or response clearly misses what the user asked
+
+Be strict. A score of 70+ means a job seeker received genuinely useful, accurate help.
 
 Today's date: {today}
 """
-
-AGENT_RUBRICS = {
-    "job_advisor": "The agent should give specific, actionable job search advice grounded in the user's actual resume and the real jobs available.",
-    "resume": "The agent should give concrete resume improvements with specific language suggestions, not generic advice.",
-    "sql": "The agent should return accurate data from the database. Any numbers or facts must match the provided query results exactly.",
-    "orchestrator": "The agent should route correctly and synthesize sub-agent responses coherently without losing information.",
-}
 
 ORCHESTRATOR_PROMPT = """You are the coordinator for a Career Assistant system.
 You do NOT answer questions yourself — you delegate to specialist agents, then synthesize their results.
