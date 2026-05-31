@@ -223,7 +223,7 @@ export default function JobsPage() {
     <div className="jobs-root">
       <nav className="navbar">
         <div className="navbar-brand">
-          <span className="logo-icon">◈</span>
+          <img src="/icon.ico" alt="Vector" className="logo-icon" style={{ width: '20px', height: '20px' }} />
           <span className="logo-text">Vector</span>
         </div>
 
@@ -285,18 +285,16 @@ export default function JobsPage() {
             )}
           </button>
         </div>
-  `
-          
-            <div className="navbar-right">
-          {activeTab === 'jobs' && (
-            <span className="jobs-count">{total} listings</span>
-          )}
+
+        <div className="navbar-right">
+         
           <ThemeToggle />
+          <div className="navbar-divider" />
           <button className="btn-logout" onClick={handleLogout}>
             Sign out
           </button>
         </div>
-      </nav>`
+      </nav>
 
       {/* ── Statistics view ── */}
       {activeTab === 'stats' && (

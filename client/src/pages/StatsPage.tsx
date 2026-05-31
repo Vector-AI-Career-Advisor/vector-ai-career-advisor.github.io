@@ -9,6 +9,7 @@ import {
   Legend,
 } from 'recharts'
 import { fetchStats, StatsResponse } from '../api/stats'
+
 import './StatsPage.css'
 
 const ACCENT   = '#7c6af7'
@@ -113,6 +114,7 @@ export default function StatsPage() {
 
   return (
     <div className="stats-root">
+     
 
 
       {/* graph of job post per day

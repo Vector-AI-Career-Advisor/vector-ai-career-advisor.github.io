@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { fetchApplications, updateApplicationStatus, Application } from '../api/applications'
+
 import './ApplicationsPage.css'
 
 const STATUS_ORDER: Application['status'][] = [
