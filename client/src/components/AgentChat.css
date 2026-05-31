@@ -102,7 +102,54 @@
   border-radius: 20px; padding: 3px 12px;
 }
 
-/* Typing indicator */
+/* ── Agent message wrapper (trace + bubble) ──────────────────────────────── */
+
+.message-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 82%;
+}
+
+.message-content .bubble {
+  max-width: 100%;
+}
+
+/* ── Routing trace ───────────────────────────────────────────────────────── */
+
+.routing-trace {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+}
+
+.routing-trace-via {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.routing-chip {
+  font-size: 10px;
+  color: var(--accent2);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+.routing-chip-pending {
+  animation: chip-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes chip-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* ── Typing indicator ────────────────────────────────────────────────────── */
+
 .typing-indicator {
   display: flex; align-items: center; gap: 4px; padding: 12px 14px;
 }

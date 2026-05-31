@@ -1,6 +1,7 @@
 """Job Advisor Agent — conversational career coaching and course recommendations."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from typing import Annotated, TypedDict
@@ -11,6 +12,8 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
+
+log = logging.getLogger("agents.job_advisor_agent")
 
 from .tools.advisor_tools import ADVISOR_TOOLS
 from .prompts import JOB_ADVISOR_PROMPT
@@ -43,8 +46,7 @@ def build_job_advisor_agent():
         if hasattr(last, "tool_calls") and last.tool_calls:
             # High-visibility logging for sub-agent tool execution
             for call in last.tool_calls:
-                print(f"[JOB ADVISOR TOOL TRIGGERED] -> Function: {call['name']}")
-                print(f"[ARGUMENTS] -> {call['args']}")
+                log.info("[TOOL] %s | args=%s", call["name"], call["args"])
             return "tools"
         return END
 

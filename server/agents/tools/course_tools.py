@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import requests
 from langchain_core.tools import tool
+
+log = logging.getLogger(__name__)
 
 
 # Maps general topics to Coursera institutions known for those subjects
@@ -52,7 +55,7 @@ def _get_institution(topic: str) -> str:
 def _search_udemy(topic: str, goal: str) -> list:
     api_key = os.getenv("RAPIDAPI_KEY_UDEMY")
     if not api_key:
-        print("[DEBUG] RAPIDAPI_KEY_UDEMY not set")
+        log.debug("RAPIDAPI_KEY_UDEMY not set — skipping Udemy search")
         return []
 
     search_query = f"{topic} project" if goal == "project" else f"{topic} course"
@@ -63,7 +66,7 @@ def _search_udemy(topic: str, goal: str) -> list:
     }
     payload = {"searchQuery": search_query, "page": 1, "limit": 10}
     try:
-        print(f"[DEBUG] Searching Udemy for: {search_query}")
+        log.debug("Udemy search: %s", search_query)
         r = requests.post(
             "https://udemy-coupons-and-courses.p.rapidapi.com/search.php",
             headers=headers,
@@ -73,17 +76,17 @@ def _search_udemy(topic: str, goal: str) -> list:
         r.raise_for_status()
         data = r.json()
         result = data if isinstance(data, list) else data.get("courses") or data.get("results") or []
-        print(f"[DEBUG] Udemy returned {len(result)} courses")
+        log.info("Udemy returned %d courses for '%s'", len(result), topic)
         return result
     except requests.RequestException as e:
-        print(f"[DEBUG] Udemy API error: {e}")
+        log.warning("Udemy API error: %s", e)
         return []
 
 
 def _search_coursera(topic: str, goal: str) -> list:
     api_key = os.getenv("RAPIDAPI_KEY_COURSERA")
     if not api_key:
-        print("[DEBUG] RAPIDAPI_KEY_COURSERA not set")
+        log.debug("RAPIDAPI_KEY_COURSERA not set — skipping Coursera search")
         return []
 
     institution = _get_institution(topic)
@@ -97,7 +100,7 @@ def _search_coursera(topic: str, goal: str) -> list:
         "course_institution": institution,
     }
     try:
-        print(f"[DEBUG] Searching Coursera institution: {institution} (for topic: {topic})")
+        log.debug("Coursera search: institution=%s topic=%s", institution, topic)
         r = requests.get(
             "https://collection-for-coursera-courses.p.rapidapi.com/rapidapi/course/get_course.php",
             headers=headers,
@@ -107,10 +110,10 @@ def _search_coursera(topic: str, goal: str) -> list:
         r.raise_for_status()
         data = r.json()
         result = data if isinstance(data, list) else data.get("courses") or data.get("results") or []
-        print(f"[DEBUG] Coursera returned {len(result)} courses")
+        log.info("Coursera returned %d courses for '%s'", len(result), topic)
         return result
     except requests.RequestException as e:
-        print(f"[DEBUG] Coursera API error: {e}")
+        log.warning("Coursera API error: %s", e)
         return []
 
 
@@ -137,11 +140,11 @@ def _ask_claude(topic: str, goal: str, courses: list[dict]) -> str:
     """Send the raw course list to Claude and ask for a concise recommendation."""
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if not anthropic_key:
-        print("[DEBUG] ANTHROPIC_API_KEY not set, using fallback")
+        log.warning("ANTHROPIC_API_KEY not set — using fallback course formatter")
         return _fallback_format(topic, goal, courses)
 
     if not courses:
-        print("[DEBUG] No courses to send to Claude, using fallback")
+        log.debug("No courses to send to Claude — using fallback")
         return _fallback_format(topic, goal, courses)
 
     goal_label = "hands-on project building" if goal == "project" else "conceptual understanding"
@@ -164,7 +167,7 @@ Write a SHORT, friendly recommendation. Rules:
 """
 
     try:
-        print(f"[DEBUG] Sending {len(courses)} courses to Claude")
+        log.info("Sending %d courses to Claude for curation (topic=%s)", len(courses), topic)
         resp = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={
@@ -180,12 +183,11 @@ Write a SHORT, friendly recommendation. Rules:
             timeout=20,
         )
         resp.raise_for_status()
-        data = resp.json()
-        result = data["content"][0]["text"].strip()
-        print("[DEBUG] Claude returned recommendation")
+        result = resp.json()["content"][0]["text"].strip()
+        log.info("Claude curation complete for topic '%s'", topic)
         return result
     except Exception as e:
-        print(f"[DEBUG] Claude API error: {e}, using fallback")
+        log.warning("Claude API error: %s — using fallback", e)
         return _fallback_format(topic, goal, courses)
 
 
@@ -225,16 +227,17 @@ def recommend_courses(topic: str, goal: str) -> str:
     Returns:
         AI-curated course recommendations with direct links and reasoning.
     """
-    print(f"\n[COURSE TOOL] Searching for '{topic}' with goal: {goal}")
+    log.info("recommend_courses called | topic='%s' goal='%s'", topic, goal)
 
     udemy_raw = _search_udemy(topic, goal)
     coursera_raw = _search_coursera(topic, goal)
 
-    print(f"[COURSE TOOL] Found {len(udemy_raw)} Udemy courses, {len(coursera_raw)} Coursera courses")
+    log.info("Course search complete | udemy=%d coursera=%d", len(udemy_raw), len(coursera_raw))
 
     if not udemy_raw and not coursera_raw:
+        log.warning("No courses found for topic='%s'", topic)
         return (
-            f"⚠️  **No courses found for '{topic}'**\n\n"
+            f"**No courses found for '{topic}'**\n\n"
             f"The course APIs couldn't connect right now. Try directly:\n\n"
             f"1. **Udemy:** udemy.com — search '{topic}'\n"
             f"2. **Coursera:** coursera.org — search '{topic}'\n"
@@ -247,5 +250,5 @@ def recommend_courses(topic: str, goal: str) -> str:
         + [_slim(c, "Udemy") for c in udemy_raw[:6]]
     )
 
-    print(f"[COURSE TOOL] Sending {len(courses)} courses to Claude for curation")
+    log.info("Sending %d combined courses to Claude for curation", len(courses))
     return _ask_claude(topic, goal, courses)

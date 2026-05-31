@@ -1,6 +1,7 @@
 """SQL Agent — handles all structured DB queries and job searches."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from typing import Annotated, TypedDict
@@ -16,6 +17,8 @@ from .tools.db_tools import DB_TOOLS
 from .prompts import SQL_AGENT_PROMPT
 
 load_dotenv()
+
+log = logging.getLogger("agents.sql_agent")
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -40,6 +43,8 @@ def build_sql_agent():
     def route(state: State):
         last = state["messages"][-1]
         if hasattr(last, "tool_calls") and last.tool_calls:
+            for call in last.tool_calls:
+                log.info("[TOOL] %s | args=%s", call["name"], call["args"])
             return "tools"
         return END
 

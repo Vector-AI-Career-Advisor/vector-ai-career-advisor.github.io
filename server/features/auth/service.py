@@ -2,10 +2,11 @@ import logging
 import httpx
 
 from fastapi import HTTPException
-from db.postgres import get_connection
-from core.security import hash_password, verify_password, create_access_token
-from core.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET
-from features.auth.schemas import UserCreate, UserLogin, TokenResponse, OAuthCallbackRequest
+from server.db.postgres import get_connection
+from server.core.security import hash_password, verify_password, create_access_token
+from server.core.logging import open_user_session
+from server.core.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET
+from server.features.auth.schemas import UserCreate, UserLogin, TokenResponse, OAuthCallbackRequest
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def login(user: UserLogin) -> TokenResponse:
             log.warning("Failed login attempt for email: %s", user.email)
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
+        open_user_session(row[0])
         return TokenResponse(access_token=create_access_token(row[0]))
     finally:
         conn.close()

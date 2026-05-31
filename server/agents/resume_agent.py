@@ -1,6 +1,7 @@
 """Resume Agent — handles resume upload, tailoring, and gap analysis."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from typing import Annotated, TypedDict
@@ -16,6 +17,8 @@ from .tools.resume_tools import RESUME_TOOLS
 from .prompts import RESUME_AGENT_PROMPT
 
 load_dotenv()
+
+log = logging.getLogger("agents.resume_agent")
 
 
 class State(TypedDict):
@@ -41,6 +44,8 @@ def build_resume_agent():
     def route(state: State):
         last = state["messages"][-1]
         if hasattr(last, "tool_calls") and last.tool_calls:
+            for call in last.tool_calls:
+                log.info("[TOOL] %s | args=%s", call["name"], call["args"])
             return "tools"
         return END
 

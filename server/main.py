@@ -15,10 +15,10 @@ from features.jobs.router import router as jobs_router
 from features.resumes.router import router as resumes_router
 from features.stats.router import router as stats_router
 from features.applications.router import router as applications_router
-from agents.router import router as agent_router
+from features.agents.router import router as agent_router
 from db.postgres import init_db
 from core.exceptions import AppError, app_error_handler
-from core.logging import setup_logging
+from server.core.logging import setup_logging
 
 setup_logging()
 log = logging.getLogger(__name__)

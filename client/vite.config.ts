@@ -13,11 +13,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
-        '/auth':         'http://localhost:8000',
-        '/jobs':         'http://localhost:8000',
-        '/resumes':      'http://localhost:8000',
-        '/applications': 'http://localhost:8000',
-        '/agent':        'http://localhost:8000',
+        '/auth':         { target: 'http://localhost:8000', changeOrigin: true },
+        '/jobs':         { target: 'http://localhost:8000', changeOrigin: true },
+        '/resumes':      { target: 'http://localhost:8000', changeOrigin: true },
+        '/applications': { target: 'http://localhost:8000', changeOrigin: true },
+        '/agents':       { target: 'http://localhost:8000', changeOrigin: true },
       },
     },
   }

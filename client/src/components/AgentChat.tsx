@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Job } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
-import api from '../api/client'
 import './AgentChat.css'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -32,16 +31,70 @@ interface Props {
 async function callAgent(
   message: string,
   selectedJob: Job | null,
-  history: Message[]
+  history: Message[],
+  onPlanning: (agents: string[]) => void,
 ): Promise<{ reply: string; agentsUsed: string[] }> {
-  const { data } = await api.post('/agents/chat', {
-    message,
-    job_id: selectedJob?.id ?? null,
-    history: history
-      .filter(m => m.role === 'user' || m.role === 'agent')
-      .map(m => ({ role: m.role, text: m.text })),
+  const token = localStorage.getItem('token')
+  const res = await fetch('/agents/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      message,
+      job_id: selectedJob?.id ?? null,
+      history: history
+        .filter(m => m.role === 'user' || m.role === 'agent')
+        .map(m => ({ role: m.role === 'agent' ? 'agents' : 'user', text: m.text })),
+    }),
   })
-  return { reply: data.reply, agentsUsed: data.agents_used ?? [] }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+    }
+    throw new Error(`HTTP ${res.status}`)
+  }
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let reply = ''
+  let agentsUsed: string[] = []
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const raw = line.slice(6).trim()
+      if (!raw) continue
+      try {
+        const event = JSON.parse(raw)
+        if (event.type === 'planning') {
+          onPlanning(event.agents)
+        } else if (event.type === 'reply') {
+          reply = event.reply
+          agentsUsed = event.agents_used ?? []
+        } else if (event.type === 'error') {
+          throw new Error(event.detail ?? 'Agent error')
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) continue
+        throw e
+      }
+    }
+  }
+
+  return { reply, agentsUsed }
 }
 
 // ─── Suggested prompts ───────────────────────────────────────────────────────
@@ -59,6 +112,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
   const [messages, setMessages]         = useState<Message[]>([])
   const [input, setInput]               = useState('')
   const [isTyping, setIsTyping]         = useState(false)
+  const [pendingAgents, setPendingAgents] = useState<string[]>([])
   const [error, setError]               = useState<string | null>(null)
   const [resumeFilename, setResumeFilename] = useState<string | null>(null)
   const [uploadState, setUploadState]   = useState<'idle' | 'uploading' | 'error'>('idle')
@@ -113,15 +167,23 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setIsTyping(true)
+    setPendingAgents([])
     setError(null)
 
     try {
-      const { reply, agentsUsed } = await callAgent(trimmed, selectedJob, messages)
+      const { reply, agentsUsed } = await callAgent(
+        trimmed,
+        selectedJob,
+        messages,
+        (agents) => setPendingAgents(agents),
+      )
+      setPendingAgents([])
       setMessages(prev => [
         ...prev,
         { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed },
       ])
     } catch {
+      setPendingAgents([])
       setError('Failed to reach the agents. Please try again.')
     } finally {
       setIsTyping(false)
@@ -263,9 +325,23 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
 
             {isTyping && (
               <div className="message-row agent">
-                <div className="bubble agent typing-indicator">
-                  <span /><span /><span />
-                  <span className="routing-label">Routing…</span>
+                <div className="message-content">
+                  {pendingAgents.length > 0 && (
+                    <div className="routing-trace">
+                      <span className="routing-trace-via">via</span>
+                      {pendingAgents.map(a => (
+                        <span key={a} className="routing-chip routing-chip-pending">
+                          {agentLabel(a)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bubble agent typing-indicator">
+                    <span /><span /><span />
+                    {pendingAgents.length === 0 && (
+                      <span className="routing-label">Routing…</span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

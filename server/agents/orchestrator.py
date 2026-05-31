@@ -27,7 +27,7 @@ from db.postgres import get_connection, insert_evaluation
 load_dotenv()
 sys.dont_write_bytecode = True
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("agents.orchestrator")
 
 # Stores the conversation history for the current request so tool wrappers
 # and the evaluator can access it without threading it through every call.
@@ -78,7 +78,9 @@ def _build_eval_context(history: list) -> dict:
 
 
 def _fire_evaluation(agent_type: AgentType, query: str, response: str) -> None:
-    """Fire-and-forget: evaluate and save to DB in a background thread."""
+    """Fire-and-forget: evaluate and save to DB in a background thread.
+    threading.Thread copies the current context at start(), so _user_ctx_var
+    is inherited automatically — no manual propagation needed."""
     history = conversation_history.get([])
     context = _build_eval_context(history)
 
@@ -106,6 +108,7 @@ def sql_agent(query: str) -> str:
     Do NOT use for course or learning recommendations.
     Pass the user's full request as `query`.
     """
+    log.info("[AGENT] dispatching → sql_agent | query=%r", query)
     history = conversation_history.get([])
     response = run_sql_agent(query, history=history)
     _fire_evaluation(AgentType.SQL, query, response)
@@ -118,6 +121,7 @@ def resume_agent(query: str) -> str:
     Use for: tailoring a resume to a job, uploading a resume, gap analysis.
     Pass the user's full request (including any job IDs) as `query`.
     """
+    log.info("[AGENT] dispatching → resume_agent | query=%r", query)
     history = conversation_history.get([])
     response = run_resume_agent(query, history=history)
     _fire_evaluation(AgentType.RESUME, query, response)
@@ -131,6 +135,7 @@ def job_advisor_agent(query: str) -> str:
     and ANY requests for course recommendations, tutorials, study plans, or learning paths.
     Pass the user's full request verbatim as `query`.
     """
+    log.info("[AGENT] dispatching → job_advisor_agent | query=%r", query)
     history = conversation_history.get([])
     response = run_job_advisor_agent(query, history=history)
     _fire_evaluation(AgentType.JOB_ADVISOR, query, response)
@@ -159,7 +164,7 @@ def build_orchestrator():
             response = llm.invoke(messages)
             return {"messages": [response]}
         except Exception as e:
-            print("LLM ERROR:", e)
+            log.error("LLM invocation error: %s", e)
             raise
         
 
@@ -174,6 +179,6 @@ def build_orchestrator():
     graph.add_node("tools", ToolNode(ORCHESTRATOR_TOOLS))
     graph.set_entry_point("coordinator")
     graph.add_conditional_edges("coordinator", route, {"tools": "tools", END: END})
-    graph.add_edge("tools", END)
+    graph.add_edge("tools", "coordinator")
 
     return graph.compile()
