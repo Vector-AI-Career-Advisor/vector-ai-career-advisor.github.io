@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { Job } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
 import './AgentChat.css'
@@ -300,7 +299,9 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                       </div>
                     )}
                     <div className="bubble agent">
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <div className="msg-text">
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
                       <span className="msg-time">
                         {msg.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
@@ -311,7 +312,11 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                   </div>
                 ) : (
                   <div className="bubble user">
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <div className="msg-text">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                    <span className="msg-time"></span>
+                   
                     <span className="msg-time">
                       {msg.timestamp.toLocaleTimeString([], {
                         hour: '2-digit',

@@ -26,6 +26,7 @@ class AgentType(str, Enum):
     RESUME = "resume"
     SQL = "sql"
     ORCHESTRATOR = "orchestrator"
+    INTERVIEW = "interview"
 
 
 @dataclass
@@ -61,9 +62,6 @@ def build_evaluator_agent():
     )
 
     def evaluator(state: State):
-        # The rubric for the target agent is embedded in the first HumanMessage
-        # by run_evaluator_agent before the graph is invoked; pull agent_type out
-        # of it so we can append the right rubric to the system prompt.
         first_msg = state["messages"][0].content if state["messages"] else ""
         agent_key = ""
         for line in first_msg.splitlines():
@@ -109,7 +107,6 @@ def run_evaluator_agent(evaluation_input: EvaluationInput) -> EvaluationResult:
     result = agent.invoke({"messages": [HumanMessage(content=query)]})
     raw = result["messages"][-1].content.strip()
 
-    # Strip markdown code fences if the model added them despite instructions
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1]
         raw = raw.rsplit("```", 1)[0].strip()

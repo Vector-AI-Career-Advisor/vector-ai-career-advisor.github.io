@@ -20,6 +20,7 @@ from langgraph.prebuilt import ToolNode
 from .sql_agent import run_sql_agent
 from .resume_agent import run_resume_agent
 from .job_advisor_agent import run_job_advisor_agent
+from .interview_agent import run_interview_agent
 from .evaluator_agent import run_evaluator_agent, EvaluationInput, AgentType
 from .prompts import ORCHESTRATOR_PROMPT
 from db.postgres import get_connection, insert_evaluation
@@ -131,7 +132,7 @@ def resume_agent(query: str) -> str:
 @tool
 def job_advisor_agent(query: str) -> str:
     """Delegate to the Job Advisor Agent for career coaching and upskilling advice.
-    Use for: interview prep, salary negotiation, role fit, application strategy,
+    Use for: interview prep advice, salary negotiation, role fit, application strategy,
     and ANY requests for course recommendations, tutorials, study plans, or learning paths.
     Pass the user's full request verbatim as `query`.
     """
@@ -142,7 +143,21 @@ def job_advisor_agent(query: str) -> str:
     return response
 
 
-ORCHESTRATOR_TOOLS = [sql_agent, resume_agent, job_advisor_agent]
+@tool
+def interview_agent(query: str) -> str:
+    """Delegate to the Interview Agent for real past interview questions and practice generation.
+    Use for: finding what questions are asked at a company, generating practice questions,
+    or building an interview prep guide for a specific company and role.
+    Always include the fully resolved company name and role in the query — never pronouns.
+    Pass the user's full request verbatim as `query`.
+    """
+    history = conversation_history.get([])
+    response = run_interview_agent(query, history=history)
+    _fire_evaluation(AgentType.INTERVIEW, query, response)
+    return response
+
+
+ORCHESTRATOR_TOOLS = [sql_agent, resume_agent, job_advisor_agent, interview_agent]
 
 
 # ── Orchestrator graph ────────────────────────────────────────────────────
@@ -166,7 +181,6 @@ def build_orchestrator():
         except Exception as e:
             log.error("LLM invocation error: %s", e)
             raise
-        
 
     def route(state: State):
         last = state["messages"][-1]
