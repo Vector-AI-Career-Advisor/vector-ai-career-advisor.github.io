@@ -52,7 +52,7 @@ def _read_json(path: str):
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
 def task_scrape(**context):
-    from pipeline.core import run_scrape
+    from server.pipeline.core import run_scrape
 
     stubs= run_scrape()
     stubs_file = _run_file(context, "stubs")
@@ -62,7 +62,7 @@ def task_scrape(**context):
 
 
 def task_extract(**context):
-    from pipeline.core import run_extract
+    from server.pipeline.core import run_extract
 
     stubs_file = context["ti"].xcom_pull(key="stubs_file", task_ids="scrape")
     stubs= _read_json(stubs_file)
@@ -74,7 +74,7 @@ def task_extract(**context):
 
 
 def task_load_postgres(**context):
-    from pipeline.core import run_load_postgres
+    from server.pipeline.core import run_load_postgres
 
     jobs_file = context["ti"].xcom_pull(key="jobs_file", task_ids="extract")
     jobs= _read_json(jobs_file)
@@ -83,7 +83,7 @@ def task_load_postgres(**context):
 
 
 def task_load_chroma(**context):
-    from pipeline.core import run_load_chroma
+    from server.pipeline.core import run_load_chroma
 
     upserted = run_load_chroma()
     log.info("ChromaDB: %d vectors upserted.", upserted)
