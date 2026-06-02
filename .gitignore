@@ -58,3 +58,5 @@ airflow-webserver.pid
 /tree.txt
 
 server/agents/tailored_resumes/
+
+tmp/
