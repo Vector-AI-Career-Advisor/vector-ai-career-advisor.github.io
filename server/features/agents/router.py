@@ -13,8 +13,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 from server.core.security import get_current_user
 from server.core.logging import set_session_user, clear_session_user
 from server.agents.orchestrator import build_orchestrator, conversation_history
-from server.agents.tools.resume_tools import set_current_user
-from server.agents.evaluator_agent import run_evaluator_agent, EvaluationInput
+from server.agents.resume.resume_tools import set_current_user
+from server.agents.eval.evaluator_agent import run_evaluator_agent, EvaluationInput
 from server.db.postgres import get_connection, insert_evaluation
 
 # Use the "agents" namespace so this module's logs flow into the session log file.

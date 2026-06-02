@@ -213,16 +213,19 @@ def tailor_resume_to_job(job_id: str) -> dict:
     """).strip()
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    try:
+        message = client.messages.create(
+            model=os.getenv("ANTHROPIC_MODEL"),
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.APIError as e:
+        return {"error": f"Resume tailoring failed: {e}. Please try again."}
     tailored_text = message.content[0].text.strip()
 
     output_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "tailored_resumes",
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "db", "tailored_resumes",
     )
     os.makedirs(output_dir, exist_ok=True)
 

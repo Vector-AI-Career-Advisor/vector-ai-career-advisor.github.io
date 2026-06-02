@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 from server.agents.orchestrator import build_orchestrator
-from server.agents.tools.resume_tools import set_current_user, _context
+from server.agents.resume.resume_tools import set_current_user, _context
 
 load_dotenv()
 
@@ -68,7 +68,7 @@ def main():
                 print("Error: not signed in. Enter your email at startup to use resume features.")
                 continue
             # Delegate directly to the resume tool (no agent overhead needed here).
-            from server.agents.tools.resume_tools import upload_resume
+            from server.agents.resume.resume_tools import upload_resume
             result = upload_resume.invoke({"path": path})
             print(result.get("message") or result.get("error"), "\n")
             continue

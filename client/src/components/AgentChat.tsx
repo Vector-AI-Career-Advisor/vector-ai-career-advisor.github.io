@@ -33,7 +33,7 @@ interface Message {
 }
 
 const AGENT_LABELS: Record<string, string> = {
-  sql_agent:         'Job Search',
+  db_agent:          'Job Search',
   resume_agent:      'Resume',
   job_advisor_agent: 'Career Advisor',
 }

@@ -13,7 +13,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from typing import Annotated, TypedDict
 
-from .prompts import EVALUATOR_PROMPT
+from server.agents.eval.prompt import PROMPT
 
 load_dotenv()
 
@@ -24,7 +24,7 @@ load_dotenv()
 class EvaluationInput:
     user_message: str       # the user's original request
     final_response: str     # the orchestrator's final reply
-    agents_used: list[str]  # routing path, e.g. ["sql_agent", "job_advisor_agent"]
+    agents_used: list[str]  # routing path, e.g. ["db_agent", "job_advisor_agent"]
 
 
 @dataclass
@@ -51,7 +51,7 @@ def build_evaluator_agent():
     )
 
     def evaluator(state: State):
-        prompt = EVALUATOR_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
+        prompt = PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
         return {"messages": [llm.invoke(messages)]}
 

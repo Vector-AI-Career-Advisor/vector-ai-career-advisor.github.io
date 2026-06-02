@@ -60,3 +60,4 @@ airflow-webserver.pid
 server/agents/tailored_resumes/
 
 tmp/
+/server/db/tailored_resumes/

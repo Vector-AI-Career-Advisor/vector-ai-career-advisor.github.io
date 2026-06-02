@@ -10,17 +10,17 @@ from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain.tools import tool
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
-from .sql_agent import run_sql_agent
-from .resume_agent import run_resume_agent
-from .job_advisor_agent import run_job_advisor_agent
-from .interview_agent import run_interview_agent
-from .prompts import ORCHESTRATOR_PROMPT
+from server.agents.data.db_agent import run_db_agent
+from server.agents.resume.resume_agent import run_resume_agent
+from server.agents.advisor.job_advisor_agent import run_job_advisor_agent
+from server.agents.interview.interview_agent import run_interview_agent
+from .prompt import PROMPT
 
 load_dotenv()
 sys.dont_write_bytecode = True
@@ -36,15 +36,15 @@ conversation_history: ContextVar[list] = ContextVar("conversation_history", defa
 # ── Tool wrappers around each specialist agent ────────────────────────────
 
 @tool
-def sql_agent(query: str) -> str:
+def db_agent(query: str) -> str:
     """Delegate to the SQL Agent for any job database queries.
     Use for: job searches, statistics, skill trends, company rankings, listings.
     Do NOT use for course or learning recommendations.
     Pass the user's full request as `query`.
     """
-    log.info("[AGENT] dispatching → sql_agent | query=%r", query)
+    log.info("[AGENT] dispatching → db_agent | query=%r", query)
     history = conversation_history.get([])
-    return run_sql_agent(query, history=history)
+    return run_db_agent(query, history=history)
 
 
 @tool
@@ -82,7 +82,7 @@ def interview_agent(query: str) -> str:
     return run_interview_agent(query, history=history)
 
 
-ORCHESTRATOR_TOOLS = [sql_agent, resume_agent, job_advisor_agent, interview_agent]
+ORCHESTRATOR_TOOLS = [db_agent, resume_agent, job_advisor_agent, interview_agent]
 
 
 # ── Orchestrator graph ────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ def build_orchestrator():
     ).bind_tools(ORCHESTRATOR_TOOLS)
 
     def coordinator(state: State):
-        prompt = ORCHESTRATOR_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
+        prompt = PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
         try:
             response = llm.invoke(messages)
