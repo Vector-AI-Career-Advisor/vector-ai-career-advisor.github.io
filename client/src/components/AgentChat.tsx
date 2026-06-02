@@ -24,20 +24,27 @@ function SimpleMarkdown({ children }: { children: string }) {
 
 type Role = 'user' | 'agent' | 'system'
 
+interface AgentStep {
+  name: string
+  description: string
+}
+
 interface Message {
   id: string
   role: Role
   text: string
   timestamp: Date
-  agentsUsed?: string[]
+  agentsUsed?: AgentStep[]
 }
 
 const AGENT_LABELS: Record<string, string> = {
-  db_agent:          'Job Search',
-  resume_agent:      'Resume',
-  job_advisor_agent: 'Career Advisor',
+  db_agent:          'Job Search Agent',
+  resume_agent:      'Resume Agent',
+  job_advisor_agent: 'Career Advisor Agent',
+  interview_agent:   'Interview Prep Agent',
 }
 const agentLabel = (name: string) => AGENT_LABELS[name] ?? name
+const formatDesc = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) + '...' : ''
 
 interface Props {
   selectedJob: Job | null
@@ -48,8 +55,8 @@ async function callAgent(
   message: string,
   selectedJob: Job | null,
   history: Message[],
-  onPlanning: (agents: string[]) => void,
-): Promise<{ reply: string; agentsUsed: string[] }> {
+  onPlanning: (agents: AgentStep[]) => void,
+): Promise<{ reply: string; agentsUsed: AgentStep[] }> {
   const token = localStorage.getItem('token')
   const res = await fetch('/agents/chat', {
     method: 'POST',
@@ -79,7 +86,7 @@ async function callAgent(
   const decoder = new TextDecoder()
   let buffer = ''
   let reply = ''
-  let agentsUsed: string[] = []
+  let agentsUsed: AgentStep[] = []
 
   while (true) {
     const { done, value } = await reader.read()
@@ -128,7 +135,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
   const [messages, setMessages]         = useState<Message[]>([])
   const [input, setInput]               = useState('')
   const [isTyping, setIsTyping]         = useState(false)
-  const [pendingAgents, setPendingAgents] = useState<string[]>([])
+  const [pendingAgents, setPendingAgents] = useState<AgentStep[]>([])
   const [error, setError]               = useState<string | null>(null)
   const [resumeFilename, setResumeFilename] = useState<string | null>(null)
   const [uploadState, setUploadState]   = useState<'idle' | 'uploading' | 'error'>('idle')
@@ -307,14 +314,6 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                   <div className="system-message">{msg.text}</div>
                 ) : msg.role === 'agent' ? (
                   <div className="message-content">
-                    {msg.agentsUsed && msg.agentsUsed.length > 0 && (
-                      <div className="routing-trace">
-                        <span className="routing-trace-via">via</span>
-                        {msg.agentsUsed.map(a => (
-                          <span key={a} className="routing-chip">{agentLabel(a)}</span>
-                        ))}
-                      </div>
-                    )}
                     <div className="bubble agent">
                       <div className="msg-text">
                         <SimpleMarkdown>{msg.text}</SimpleMarkdown>
@@ -349,20 +348,23 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
               <div className="message-row agent">
                 <div className="message-content">
                   {pendingAgents.length > 0 && (
-                    <div className="routing-trace">
-                      <span className="routing-trace-via">via</span>
-                      {pendingAgents.map(a => (
-                        <span key={a} className="routing-chip routing-chip-pending">
-                          {agentLabel(a)}
-                        </span>
+                    <div className="agent-chain">
+                      {pendingAgents.map((a, i) => (
+                        <div key={a.name} className="agent-chain-row">
+                          <div className="agent-chain-track">
+                            <div className="agent-chain-dot pending" />
+                            {i < pendingAgents.length - 1 && <div className="agent-chain-line pending" />}
+                          </div>
+                          <div className="agent-chain-info">
+                            <span className="agent-chain-label pending">{agentLabel(a.name)}</span>
+                            {a.description && <span className="agent-chain-desc pending">{formatDesc(a.description)}</span>}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
                   <div className="bubble agent typing-indicator">
                     <span /><span /><span />
-                    {pendingAgents.length === 0 && (
-                      <span className="routing-label">Routing…</span>
-                    )}
                   </div>
                 </div>
               </div>

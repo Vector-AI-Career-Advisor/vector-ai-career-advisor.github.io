@@ -111,6 +111,7 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
             """
             set_session_user(int(user_id))
             agents_used: List[str] = []
+            agent_steps: List[dict] = []   # [{name, description}, ...] for the UI
             final_reply = ""
             try:
                 token = conversation_history.set(lc_history[:-1])
@@ -130,22 +131,27 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                         if not isinstance(msg, AIMessage):
                             continue
                         if getattr(msg, "tool_calls", None):
-                            new_agents = [
-                                tc["name"] for tc in msg.tool_calls
+                            new_steps = [
+                                {
+                                    "name": tc["name"],
+                                    "description": tc.get("args", {}).get("query", ""),
+                                }
+                                for tc in msg.tool_calls
                                 if tc.get("name") and tc["name"] not in agents_used
                             ]
-                            if new_agents:
-                                agents_used.extend(new_agents)
+                            if new_steps:
+                                agents_used.extend(s["name"] for s in new_steps)
+                                agent_steps.extend(new_steps)
                                 loop.call_soon_threadsafe(
                                     queue.put_nowait,
-                                    f"data: {json.dumps({'type': 'planning', 'agents': agents_used})}\n\n",
+                                    f"data: {json.dumps({'type': 'planning', 'agents': agent_steps})}\n\n",
                                 )
                         elif msg.content:
                             final_reply = msg.content
 
                 loop.call_soon_threadsafe(
                     queue.put_nowait,
-                    f"data: {json.dumps({'type': 'reply', 'reply': final_reply, 'agents_used': agents_used})}\n\n",
+                    f"data: {json.dumps({'type': 'reply', 'reply': final_reply, 'agents_used': agent_steps})}\n\n",
                 )
                 if final_reply:
                     _fire_orchestrator_evaluation(req.message, final_reply, agents_used)
