@@ -22,16 +22,17 @@ import os
 import re
 import urllib.parse
 
+import anthropic
 import requests
 from langchain.tools import tool
 
 # ── Config ─────────────────────────────────────────────────────────────────
 
-SERPER_API_KEY    = os.getenv("SERPER_API_KEY", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL   = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-SERPER_URL        = "https://google.serper.dev/search"
-ANTHROPIC_URL     = "https://api.anthropic.com/v1/messages"
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+SERPER_URL     = "https://google.serper.dev/search"
+
+_anthropic = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+_MODEL     = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 def _web_search(query: str, num: int = 8) -> list[dict]:
     """Return [{title, link, snippet}] from Serper (Google Search API). Returns [] on any failure."""
@@ -54,27 +55,14 @@ def _web_search(query: str, num: int = 8) -> list[dict]:
 
 
 def _ask_claude(prompt: str, max_tokens: int = 800) -> str:
-    """Call the Anthropic API directly and return the text response. Used as web-search fallback."""
-    if not ANTHROPIC_API_KEY:
-        return ""
+    """Call Claude and return the text response. Used as web-search fallback."""
     try:
-        resp = requests.post(
-            ANTHROPIC_URL,
-            headers={
-                "x-api-key":         ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type":      "application/json",
-            },
-            json={
-                "model":      ANTHROPIC_MODEL,
-                "max_tokens": max_tokens,
-                "messages":   [{"role": "user", "content": prompt}],
-            },
-            timeout=30,
+        resp = _anthropic.messages.create(
+            model=_MODEL,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
         )
-        resp.raise_for_status()
-        blocks = resp.json().get("content", [])
-        return "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
+        return resp.content[0].text.strip()
     except Exception:
         return ""
 
@@ -97,26 +85,27 @@ _GLASSDOOR_IDS: dict[str, str] = {
 }
 
 
-def _glassdoor_interview_url(company: str, role: str) -> tuple[str, str]:
+def _glassdoor_interview_url(company: str) -> tuple[str, str]:
     """
-    Build the URL that Glassdoor's search form would produce.
-    Format: /Interview/index.htm?typedKeyword=<company>&locT=N&locId=3
-    locId=3 = Israel, locT=N = Nationwide
+    Return (direct_url, search_fallback_url) for a company's Glassdoor interview page.
+    direct_url uses the known company ID when available; falls back to the search form otherwise.
+    search_fallback_url always uses the search form so the user always has a working link.
     """
-    encoded_company = urllib.parse.quote_plus(company)
-    
-    direct = (
+    key = company.lower().replace(" ", "-")
+    search = (
         f"https://www.glassdoor.com/Interview/index.htm"
-        f"?typedKeyword={encoded_company}&locT=N&locId=3"
+        f"?typedKeyword={urllib.parse.quote_plus(company)}&locT=N&locId=3"
     )
-    return direct, direct
+    gd_id = _GLASSDOOR_IDS.get(key)
+    if gd_id:
+        slug   = company.replace(" ", "-").title()
+        direct = f"https://www.glassdoor.com/Interview/{slug}-Interview-Questions-{gd_id}.htm"
+        return direct, search
+    return search, search
 
 def _format_sources(results: list[dict]) -> str:
-    lines = []
-    for r in results:
-        if r["link"]:
-            lines.append(f"- [{r['title']}]({r['link']})")
-    return "\n".join(lines) if lines else "No sources found."
+    lines = [f"- [{r['title']}]({r['link']})" for r in results if r["link"]]
+    return "\n".join(lines)
 
 
 def _extract_questions_from_snippets(snippets: list[str]) -> list[str]:
@@ -161,7 +150,7 @@ def search_interview_questions(company: str, role: str) -> str:
         company: Company name, e.g. "Fullpath", "Meta", "Google".
         role:    Job role, e.g. "Junior Software Engineer", "Data Analyst".
     """
-    glassdoor_direct, glassdoor_search = _glassdoor_interview_url(company, role)
+    glassdoor_direct, glassdoor_search = _glassdoor_interview_url(company)
     # ── Layer 1: web search ────────────────────────────────────────────────
     all_results: list[dict] = []
     seen_links: set[str] = set()
@@ -252,7 +241,7 @@ def generate_interview_questions(company: str, role: str, num_questions: int = 1
         role:          Target role, e.g. "Junior Software Engineer".
         num_questions: How many questions to generate (default 12).
     """
-    glassdoor_direct, _ = _glassdoor_interview_url(company, role)
+    glassdoor_direct, _ = _glassdoor_interview_url(company)
 
     context_results = _web_search(f"{company} tech stack engineering blog technologies used", num=5)
     context_text    = " ".join(r["snippet"] for r in context_results if r["snippet"])[:1200]
@@ -312,7 +301,7 @@ def get_interview_prep_guide(company: str, role: str) -> str:
         company: Target company, e.g. "Fullpath".
         role:    Target role, e.g. "Junior Software Engineer".
     """
-    glassdoor_direct, glassdoor_search = _glassdoor_interview_url(company, role)
+    glassdoor_direct, glassdoor_search = _glassdoor_interview_url(company)
 
     all_results: list[dict] = []
     seen: set[str] = set()

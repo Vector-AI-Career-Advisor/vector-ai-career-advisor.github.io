@@ -19,6 +19,7 @@ from langgraph.prebuilt import ToolNode
 from .sql_agent import run_sql_agent
 from .resume_agent import run_resume_agent
 from .job_advisor_agent import run_job_advisor_agent
+from .interview_agent import run_interview_agent
 from .prompts import ORCHESTRATOR_PROMPT
 
 load_dotenv()
@@ -78,9 +79,7 @@ def interview_agent(query: str) -> str:
     Pass the user's full request verbatim as `query`.
     """
     history = conversation_history.get([])
-    response = run_interview_agent(query, history=history)
-    _fire_evaluation(AgentType.INTERVIEW, query, response)
-    return response
+    return run_interview_agent(query, history=history)
 
 
 ORCHESTRATOR_TOOLS = [sql_agent, resume_agent, job_advisor_agent, interview_agent]

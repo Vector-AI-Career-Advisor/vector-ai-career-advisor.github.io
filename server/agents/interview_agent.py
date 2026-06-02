@@ -1,6 +1,7 @@
 """Interview Agent — finds real past interview questions and generates practice questions."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date
 from typing import Annotated, TypedDict
@@ -16,6 +17,8 @@ from .tools.interview_tools import INTERVIEW_TOOLS
 from .prompts import INTERVIEW_AGENT_PROMPT
 
 load_dotenv()
+
+log = logging.getLogger("agents.interview_agent")
 
 
 class State(TypedDict):
@@ -42,8 +45,7 @@ def build_interview_agent():
         last = state["messages"][-1]
         if hasattr(last, "tool_calls") and last.tool_calls:
             for call in last.tool_calls:
-                print(f"[INTERVIEW AGENT TOOL TRIGGERED] -> Function: {call['name']}")
-                print(f"[ARGUMENTS] -> {call['args']}")
+                log.info("[TOOL] %s | args=%s", call["name"], call["args"])
             return "tools"
         return END
 
