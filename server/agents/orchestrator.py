@@ -81,7 +81,7 @@ class State(TypedDict):
 def build_orchestrator():
     llm = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
-        model=os.getenv("ANTHROPIC_MODEL"),
+        model=os.getenv("ORCHESTRATOR_MODEL"),
     ).bind_tools(ORCHESTRATOR_TOOLS)
 
     def coordinator(state: State):

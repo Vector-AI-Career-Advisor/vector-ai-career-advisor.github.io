@@ -36,8 +36,7 @@ services:
     restart: always
     environment:
       DOCKER_DB_HOST: postgres
-      DOCKER_OLLAMA_URL: http://ollama:11434
-      DB_PORT: 5432      
+      DB_PORT: 5432
       PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/career_assistant/dags
@@ -59,8 +58,7 @@ services:
     restart: always
     environment:
       DOCKER_DB_HOST: postgres
-      DOCKER_OLLAMA_URL: http://ollama:11434
-      DB_PORT: 5432      
+      DB_PORT: 5432
       PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -80,21 +78,5 @@ services:
         condition: service_completed_successfully
     command: airflow webserver
 
-  ollama:
-    image: ollama/ollama
-    volumes:
-      - ollama_models:/root/.ollama
-    ports:
-      - "11434:11434"
-    # Uncomment to enable GPU pass-through (requires nvidia-container-toolkit):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-    
 volumes:
   postgres_data:
-  ollama_models:

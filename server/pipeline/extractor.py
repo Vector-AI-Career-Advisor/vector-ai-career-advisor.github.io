@@ -1,4 +1,4 @@
-"""LLM-based job description extraction using a local Ollama model."""
+"""LLM-based job description extraction using Claude."""
 from __future__ import annotations
 
 import json
@@ -8,19 +8,19 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
-import requests
+import anthropic
 
 from server.core.config import (
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
     EXTRACTION_PROMPT,
-    OLLAMA_BASE_URL,
-    OLLAMA_MODEL,
     VALID_ROLES,
     VALID_SENIORITY,
 )
 
 log = logging.getLogger(__name__)
 
-_CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
+_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # ── Description pre-processing ────────────────────────────────────────────────
 #
@@ -61,44 +61,42 @@ def _preprocess_description(raw: str) -> str:
 
 # ── Public extraction API ─────────────────────────────────────────────────────
 
-def extract_with_ollama(title: str, description: str) -> dict:
-    """Send a job title + description to Ollama and return a structured dict."""
+def extract_with_claude(title: str, description: str) -> dict:
+    """Send a job title + description to Claude and return a structured dict."""
     if not description or description == "N/A":
         return _empty_extraction()
 
     processed = _preprocess_description(description)
-    payload = {
-        "model": OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": EXTRACTION_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"Job Title: {title}\n\n"
-                    f"Job Description:\n{processed}\n\n"
-                    "JSON:"
-                ),
-            },
-        ],
-        "stream": False,
-        "options": {"temperature": 0},
-    }
 
     for attempt in range(3):
         try:
-            resp = requests.post(_CHAT_URL, json=payload, timeout=120)
-            resp.raise_for_status()
-            raw = resp.json()["message"]["content"].strip()
+            resp = _client.messages.create(
+                model=ANTHROPIC_MODEL,
+                max_tokens=1024,
+                temperature=0,
+                system=EXTRACTION_PROMPT,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Job Title: {title}\n\n"
+                            f"Job Description:\n{processed}\n\n"
+                            "JSON:"
+                        ),
+                    }
+                ],
+            )
+            raw = resp.content[0].text.strip()
             return _parse_and_validate(raw, title)
 
         except json.JSONDecodeError as e:
-            log.warning("Ollama JSON parse error (attempt %d/3): %s", attempt + 1, e)
+            log.warning("Claude JSON parse error (attempt %d/3): %s", attempt + 1, e)
             if attempt == 2:
                 return _empty_extraction()
             time.sleep(2)
 
-        except requests.RequestException as e:
-            log.warning("Ollama request error (attempt %d/3): %s", attempt + 1, e)
+        except anthropic.APIError as e:
+            log.warning("Claude API error (attempt %d/3): %s", attempt + 1, e)
             if attempt == 2:
                 return _empty_extraction()
             time.sleep(5)
@@ -108,10 +106,7 @@ def extract_with_ollama(title: str, description: str) -> dict:
 
 def extract_all_parallel(stubs: list[dict]) -> list[dict]:
     """
-    Run Ollama extraction with a small thread pool.
-
-    Ollama serialises requests internally on a single GPU, but a pool of
-    workers avoids blocking on network round-trips and keeps the queue full.
+    Run LLM-based extraction with a small thread pool.
     """
     if not stubs:
         return []
@@ -127,7 +122,7 @@ def extract_all_parallel(stubs: list[dict]) -> list[dict]:
             "[%d/%d] Extracting: %s | %s",
             idx + 1, len(valid_stubs), stub["title"], stub["company"],
         )
-        return idx, extract_with_ollama(stub["title"], stub["raw_description"])
+        return idx, extract_with_claude(stub["title"], stub["raw_description"])
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(_worker, i, stub): i for i, stub in enumerate(valid_stubs)}
