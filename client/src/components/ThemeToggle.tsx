@@ -38,9 +38,9 @@ export default function ThemeToggle() {
       className="theme-toggle"
       onClick={() => setDark(d => !d)}
       aria-label={`Switch to ${dark ? 'light' : 'dark'} mode`}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {dark ? <IconSun /> : <IconMoon />}
-      {dark ? 'Light mode' : 'Dark mode'}
     </button>
   )
 }

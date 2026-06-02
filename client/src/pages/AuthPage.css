@@ -116,28 +116,21 @@ input { font-family: var(--font); }
   50%      { transform: translateY(-28px); }
 }
 
-.auth-hero-content { position: relative; z-index: 2; max-width: 460px; width: 100%; }
+.auth-hero-content { position: relative; z-index: 2; max-width: 580px; width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
 
 .auth-logo {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 2.2rem;
+  margin-bottom: 1.4rem;
   animation: fadeUp .5s ease both .05s;
 }
 .auth-logo img {
-  width: 34px; height: 34px; object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(124,90,247,.5));
-}
-.logo-text {
-  font-family: var(--font);
-  font-size: 1.25rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  background: linear-gradient(100deg, var(--g-start), var(--g-mid), var(--g-end));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  max-height: 180px; width: auto; object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(124,90,247,.45));
 }
 
 .auth-eyebrow {
   font-size: .7rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
   color: var(--accent); display: flex; align-items: center; gap: 10px;
-  margin-bottom: 1rem; animation: fadeUp .55s ease both .15s;
+  margin-bottom: .6rem; animation: fadeUp .55s ease both .15s;
 }
 .auth-eyebrow::before {
   content: ''; display: block; width: 22px; height: 1.5px;
@@ -146,8 +139,8 @@ input { font-family: var(--font); }
 
 .auth-headline {
   font-family: var(--font-s);
-  font-size: clamp(1.8rem, 2.6vw, 2.5rem); font-weight: 400; line-height: 1.15;
-  color: var(--text); margin-bottom: 1rem; animation: fadeUp .6s ease both .25s;
+  font-size: clamp(1.5rem, 2.2vw, 2rem); font-weight: 400; line-height: 1.15;
+  color: var(--text); margin-bottom: .6rem; animation: fadeUp .6s ease both .25s;
 }
 .auth-headline em {
   font-style: italic;
@@ -157,16 +150,16 @@ input { font-family: var(--font); }
 
 .auth-sub {
   color: var(--muted-hi); font-size: .87rem; font-weight: 300; line-height: 1.65;
-  max-width: 390px; margin-bottom: 1.8rem; animation: fadeUp .6s ease both .32s;
+  max-width: 390px; margin: 0 auto 1rem; animation: fadeUp .6s ease both .32s;
 }
 
-.auth-features { display: flex; flex-direction: column; gap: 8px; animation: fadeUp .65s ease both .4s; }
+.auth-features { display: flex; flex-direction: column; gap: 9px; animation: fadeUp .65s ease both .4s; width: 100%; }
 
 .auth-feat {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: .75rem 1rem;
+  display: flex; align-items: center; gap: 12px;
+  padding: .65rem 1rem; text-align: left;
   background: var(--feat-bg);
-  border: 1px solid var(--border); border-radius: 12px;
+  border: 1px solid var(--border); border-radius: 10px;
   transition: background .25s, border-color .25s;
 }
 .auth-feat:hover { background: var(--feat-bg-h); border-color: rgba(124,90,247,.25); }
@@ -181,8 +174,8 @@ input { font-family: var(--font); }
 .feat-icon.pink { background: rgba(232,100,180,.12); color: #e864b4; }
 .feat-icon svg { width: 15px; height: 15px; }
 
-.feat-body strong { font-size: .8rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 2px; }
-.feat-body span   { font-size: .74rem; color: var(--muted); line-height: 1.5; }
+.feat-body strong { font-size: .97rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 2px; }
+.feat-body span   { font-size: .81rem; color: var(--muted); line-height: 1.5; }
 
 /* ═══════════ RIGHT PANEL ═══════════ */
 .auth-panel {
@@ -202,18 +195,17 @@ input { font-family: var(--font); }
 }
 
 /* ── Theme toggle ── */
-.theme-toggle {
+.auth-theme-toggle {
   position: absolute; top: 1.25rem; right: 1.25rem;
-  display: flex; align-items: center; gap: 6px;
-  padding: .45rem .85rem;
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
   background: var(--toggle-bg);
-  border: 1px solid var(--border); border-radius: 999px;
-  font-family: var(--font); font-size: .75rem; font-weight: 500;
+  border: 1px solid var(--border);
   color: var(--toggle-c);
   transition: background .2s, color .2s;
-  z-index: 10;
+  z-index: 10; cursor: pointer;
 }
-.theme-toggle:hover { background: var(--toggle-bg-h); color: var(--text); }
+.auth-theme-toggle:hover { background: var(--toggle-bg-h); color: var(--text); }
 
 .auth-card { width: 100%; max-width: 400px; animation: fadeUp .7s ease both .1s; }
 
