@@ -12,7 +12,7 @@ def _resolve(path: str) -> str:
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
+    "host":     os.getenv("DOCKER_DB_HOST") or os.getenv("DB_HOST", "localhost"),
     "port":     int(os.getenv("DB_PORT", 5432)),
     "dbname":   os.getenv("DB_NAME", "jobboard"),
     "user":     os.getenv("DB_USER", "postgres"),
