@@ -30,6 +30,7 @@ tiktoken==0.8.0
 selenium==4.21.0
 undetected-chromedriver==3.5.5
 webdriver-manager==4.0.1
+playwright==1.44.0
 
 # ── Utilities ────────────────────────────
 python-dotenv==1.0.1

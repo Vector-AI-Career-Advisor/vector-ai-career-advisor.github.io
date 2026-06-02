@@ -1,8 +1,24 @@
 import { useState, useRef, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
 import { Job } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
 import './AgentChat.css'
+
+// ─── Simple markdown renderer (no external dependency) ───────────────────────
+function SimpleMarkdown({ children }: { children: string }) {
+  const html = children
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>[\s\S]+?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n/g, '<br/>')
+  return <span dangerouslySetInnerHTML={{ __html: html }} />
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -300,7 +316,9 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                       </div>
                     )}
                     <div className="bubble agent">
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <div className="msg-text">
+                        <SimpleMarkdown>{msg.text}</SimpleMarkdown>
+                      </div>
                       <span className="msg-time">
                         {msg.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
@@ -311,7 +329,11 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                   </div>
                 ) : (
                   <div className="bubble user">
-                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      <div className="msg-text">
+                      <SimpleMarkdown>{msg.text}</SimpleMarkdown>
+                    </div>
+                    <span className="msg-time"></span>
+                   
                     <span className="msg-time">
                       {msg.timestamp.toLocaleTimeString([], {
                         hour: '2-digit',
