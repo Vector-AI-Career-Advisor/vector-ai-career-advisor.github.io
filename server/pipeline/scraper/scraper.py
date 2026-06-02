@@ -29,7 +29,7 @@ def build_driver() -> uc.Chrome:
     options.add_argument("--disable-web-security")
     options.add_argument("--disable-features=IsolateOrigins,site-per-process")
 
-    driver = uc.Chrome(options=options, use_subprocess=True)
+    driver = uc.Chrome(options=options, use_subprocess=True, version_main=CHROME_VERSION)
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {
         "headers": {"Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8"}
     })

@@ -1,50 +1,39 @@
-"""Evaluator Agent — judges the accuracy and quality of other agents' responses."""
+"""Evaluator Agent — judges the orchestrator's final response and routing decisions."""
 from __future__ import annotations
 
 import json
 import os
 from dataclasses import dataclass
 from datetime import date
-from enum import Enum
-from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from typing import Annotated, TypedDict
 
-from .prompts import EVALUATOR_PROMPT, AGENT_RUBRICS
+from .prompts import EVALUATOR_PROMPT
 
 load_dotenv()
 
 
 # ── Domain types ──────────────────────────────────────────────────────────────
 
-class AgentType(str, Enum):
-    JOB_ADVISOR = "job_advisor"
-    RESUME = "resume"
-    SQL = "sql"
-    ORCHESTRATOR = "orchestrator"
-    INTERVIEW = "interview"
-
-
 @dataclass
 class EvaluationInput:
-    agent_type: AgentType
-    user_message: str       # what the user asked
-    agent_response: str     # what the agent replied
-    context: dict           # e.g. resume content, job data — whatever the agent had access to
+    user_message: str       # the user's original request
+    final_response: str     # the orchestrator's final reply
+    agents_used: list[str]  # routing path, e.g. ["sql_agent", "job_advisor_agent"]
 
 
 @dataclass
 class EvaluationResult:
     score: int              # 0–100
     passed: bool            # score >= 70
-    dimensions: dict        # {accuracy, relevance, completeness, tone, groundedness} → {score, reason}
-    critique: str           # what the agent did wrong or could improve
-    suggested_response: str # better version of the response, or "N/A"
-    agent_type: AgentType
+    dimensions: dict        # {routing, completeness, accuracy, synthesis, tone} → {score, reason}
+    critique: str           # what the orchestrator did wrong or could improve
+    suggested_response: str # better version, or "N/A"
     latency_ms: int | None = None
 
 
@@ -62,16 +51,7 @@ def build_evaluator_agent():
     )
 
     def evaluator(state: State):
-        first_msg = state["messages"][0].content if state["messages"] else ""
-        agent_key = ""
-        for line in first_msg.splitlines():
-            if line.startswith("Agent:"):
-                agent_key = line.split(":", 1)[1].strip()
-                break
-
-        rubric = AGENT_RUBRICS.get(agent_key, "")
-        base = EVALUATOR_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
-        prompt = f"{base}\nAgent-specific rubric: {rubric}" if rubric else base
+        prompt = EVALUATOR_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
         return {"messages": [llm.invoke(messages)]}
 
@@ -94,14 +74,13 @@ def get_evaluator_agent():
 
 
 def run_evaluator_agent(evaluation_input: EvaluationInput) -> EvaluationResult:
-    """Evaluate an agent's response and return a structured EvaluationResult."""
+    """Evaluate the orchestrator's response and return a structured EvaluationResult."""
+    routing_path = " → ".join(evaluation_input.agents_used) if evaluation_input.agents_used else "none"
     query = (
-        f"Agent: {evaluation_input.agent_type.value}\n"
-        f"User message: {evaluation_input.user_message}\n"
-        f"Agent response: {evaluation_input.agent_response}\n"
+        f"User request: {evaluation_input.user_message}\n"
+        f"Agents invoked: {routing_path}\n"
+        f"Final response: {evaluation_input.final_response}\n"
     )
-    if evaluation_input.context:
-        query += f"Context available to agent: {json.dumps(evaluation_input.context)}\n"
 
     agent = get_evaluator_agent()
     result = agent.invoke({"messages": [HumanMessage(content=query)]})
@@ -118,5 +97,4 @@ def run_evaluator_agent(evaluation_input: EvaluationInput) -> EvaluationResult:
         dimensions=data["dimensions"],
         critique=data["critique"],
         suggested_response=data.get("suggested_response", ""),
-        agent_type=evaluation_input.agent_type,
     )

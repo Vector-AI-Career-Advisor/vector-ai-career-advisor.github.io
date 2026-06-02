@@ -12,7 +12,7 @@ def _resolve(path: str) -> str:
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST", "localhost"),
+    "host":     os.getenv("DOCKER_DB_HOST") or os.getenv("DB_HOST", "localhost"),
     "port":     int(os.getenv("DB_PORT", 5432)),
     "dbname":   os.getenv("DB_NAME", "jobboard"),
     "user":     os.getenv("DB_USER", "postgres"),
@@ -40,7 +40,7 @@ LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # ── Ollama (local inference) ──────────────────────────────────────────────────
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_BASE_URL = os.getenv("DOCKER_OLLAMA_URL") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # ── Anthropic ─────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")

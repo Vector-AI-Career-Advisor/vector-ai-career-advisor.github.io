@@ -98,7 +98,7 @@ def run_scrape(daily_target: int = DAILY_TARGET) -> List[dict]:
 
 def run_extract(stubs: List[dict]) -> List[dict]:
     """
-    Run Ollama extraction on all stubs in parallel.
+    Run extraction on all stubs in parallel.
     Returns a list of fully structured job dicts ready for storage.
     """
     if not stubs:

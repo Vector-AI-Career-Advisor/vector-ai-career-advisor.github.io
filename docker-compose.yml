@@ -3,15 +3,15 @@ services:
   postgres:
     image: postgres:13
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: airflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
       retries: 5
 
@@ -21,7 +21,7 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/career_assistant/dags
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres/airflow
     volumes:
       - .:/opt/career_assistant
     depends_on:
@@ -30,15 +30,17 @@ services:
     command: >
       bash -c "airflow db init &&
       airflow users create --username airflow --password airflow --firstname Air --lastname Flow --role Admin --email airflow@example.com || true"
-
+  
   scheduler:
     build: .
     restart: always
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      DOCKER_DB_HOST: postgres
+      DB_PORT: 5432
+      PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/career_assistant/dags
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres/airflow
     env_file:
       - .env
     volumes:
@@ -55,10 +57,13 @@ services:
     build: .
     restart: always
     environment:
+      DOCKER_DB_HOST: postgres
+      DB_PORT: 5432
+      PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/career_assistant/dags
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres/airflow
     env_file:
       - .env
     volumes:
@@ -73,21 +78,5 @@ services:
         condition: service_completed_successfully
     command: airflow webserver
 
-  ollama:
-    image: ollama/ollama
-    volumes:
-      - ollama_models:/root/.ollama
-    ports:
-      - "11434:11434"
-    # Uncomment to enable GPU pass-through (requires nvidia-container-toolkit):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
 volumes:
   postgres_data:
-  ollama_models:
