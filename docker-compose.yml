@@ -36,6 +36,7 @@ services:
     restart: always
     environment:
       DOCKER_DB_HOST: postgres
+      DOCKER_OLLAMA_URL: http://ollama:11434
       DB_PORT: 5432      
       PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -58,6 +59,7 @@ services:
     restart: always
     environment:
       DOCKER_DB_HOST: postgres
+      DOCKER_OLLAMA_URL: http://ollama:11434
       DB_PORT: 5432      
       PYTHONPATH: /opt/career_assistant:/opt/career_assistant/server
       AIRFLOW__CORE__EXECUTOR: LocalExecutor

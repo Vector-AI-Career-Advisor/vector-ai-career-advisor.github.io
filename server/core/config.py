@@ -40,7 +40,7 @@ LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # ── Ollama (local inference) ──────────────────────────────────────────────────
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_BASE_URL = os.getenv("DOCKER_OLLAMA_URL") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # ── Anthropic ─────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
