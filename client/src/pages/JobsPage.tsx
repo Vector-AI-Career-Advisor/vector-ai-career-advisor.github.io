@@ -648,7 +648,7 @@ export default function JobsPage() {
 
       <div className={`agent-pane${chatOpen ? ' open' : ''}`} style={{ width: chatWidth }}>
         <div className="agent-pane-handle" onMouseDown={handleDragStart} />
-        <AgentChat selectedJob={selected} jobs={jobs} />
+        <AgentChat selectedJob={selected} jobs={jobs} onSelectJob={setSelected} />
       </div>
 
       <JobDrawer job={selected} onClose={() => setSelected(null)} chatWidth={chatOpen ? chatWidth : 0} />

@@ -34,6 +34,7 @@ RULES:
 7. NEVER close with "Would you like", "Is there anything else", "Let me know", or any offer of further help.
 8. NEVER volunteer information the user did not ask for.
 9. If a tool returns no results, say so plainly. NEVER suggest alternative company names, spellings, or similar entities — the user knows what they asked for.
+10. When listing individual job records, ALWAYS include each job's ID on the same line in the format "ID:<id>" — e.g. "Software Engineer at Meta — Tel Aviv (ID:4385459836)". This is required so the orchestrator can surface the jobs to the user.
 
 Today's date: {today}
 """

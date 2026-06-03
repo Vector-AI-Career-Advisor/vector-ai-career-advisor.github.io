@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Job } from '../api/jobs'
+import { Job, fetchJob } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
 import './AgentChat.css'
 
@@ -35,6 +35,7 @@ interface Message {
   text: string
   timestamp: Date
   agentsUsed?: AgentStep[]
+  jobIds?: string[]
 }
 
 const AGENT_LABELS: Record<string, string> = {
@@ -49,6 +50,7 @@ const formatDesc = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) + '
 interface Props {
   selectedJob: Job | null
   jobs?: Job[]
+  onSelectJob?: (job: Job) => void
 }
 
 async function callAgent(
@@ -56,7 +58,7 @@ async function callAgent(
   selectedJob: Job | null,
   history: Message[],
   onPlanning: (agents: AgentStep[]) => void,
-): Promise<{ reply: string; agentsUsed: AgentStep[] }> {
+): Promise<{ reply: string; agentsUsed: AgentStep[]; jobIds: string[] }> {
   const token = localStorage.getItem('token')
   const res = await fetch('/agents/chat', {
     method: 'POST',
@@ -87,6 +89,7 @@ async function callAgent(
   let buffer = ''
   let reply = ''
   let agentsUsed: AgentStep[] = []
+  let jobIds: string[] = []
 
   while (true) {
     const { done, value } = await reader.read()
@@ -107,6 +110,7 @@ async function callAgent(
         } else if (event.type === 'reply') {
           reply = event.reply
           agentsUsed = event.agents_used ?? []
+          jobIds = event.job_ids ?? []
         } else if (event.type === 'error') {
           throw new Error(event.detail ?? 'Agent error')
         }
@@ -117,7 +121,39 @@ async function callAgent(
     }
   }
 
-  return { reply, agentsUsed }
+  return { reply, agentsUsed, jobIds }
+}
+
+// ─── Job mini-card ────────────────────────────────────────────────────────────
+
+function JobMiniCard({ jobId, onOpen }: { jobId: string; onOpen?: (job: Job) => void }) {
+  const [job, setJob] = useState<Job | null>(null)
+
+  useEffect(() => {
+    fetchJob(jobId).then(setJob).catch(() => {})
+  }, [jobId])
+
+  if (!job) return (
+    <div className="job-mini-card job-mini-card--loading">
+      <div className="job-mini-card-shimmer" />
+    </div>
+  )
+
+  return (
+    <div className="job-mini-card">
+      <div className="job-mini-card-info">
+        <p className="job-mini-card-title">{job.title}</p>
+        <p className="job-mini-card-meta">
+          {[job.company, job.location].filter(Boolean).join(' · ')}
+        </p>
+      </div>
+      {onOpen && (
+        <button className="job-mini-card-btn" onClick={() => onOpen(job)}>
+          Open
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ─── Suggested prompts ───────────────────────────────────────────────────────
@@ -131,7 +167,7 @@ const SUGGESTIONS = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function AgentChat({ selectedJob, jobs = [] }: Props) {
+export default function AgentChat({ selectedJob, jobs = [], onSelectJob }: Props) {
   const [messages, setMessages]         = useState<Message[]>([])
   const [input, setInput]               = useState('')
   const [isTyping, setIsTyping]         = useState(false)
@@ -175,7 +211,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     setError(null)
 
     try {
-      const { reply, agentsUsed } = await callAgent(
+      const { reply, agentsUsed, jobIds } = await callAgent(
         trimmed,
         selectedJob,
         messages,
@@ -184,7 +220,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
       setPendingAgents([])
       setMessages(prev => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed },
+        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed, jobIds },
       ])
     } catch {
       setPendingAgents([])
@@ -306,6 +342,13 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                       <div className="msg-text">
                         <SimpleMarkdown>{msg.text}</SimpleMarkdown>
                       </div>
+                      {msg.jobIds && msg.jobIds.length > 0 && (
+                        <div className="job-mini-cards">
+                          {msg.jobIds.map(id => (
+                            <JobMiniCard key={id} jobId={id} onOpen={onSelectJob} />
+                          ))}
+                        </div>
+                      )}
                       <span className="msg-time">
                         {msg.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',

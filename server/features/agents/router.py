@@ -149,12 +149,30 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                         elif msg.content:
                             final_reply = msg.content
 
+                # Parse structured JSON response from orchestrator.
+                # Strip markdown code fences the model sometimes adds.
+                reply_text = final_reply
+                reply_job_ids: list = []
+                if final_reply:
+                    try:
+                        raw = final_reply.strip()
+                        if raw.startswith("```"):
+                            raw = raw.split("\n", 1)[-1]
+                            raw = raw.rsplit("```", 1)[0]
+                            raw = raw.strip()
+                        parsed = json.loads(raw)
+                        reply_text = parsed.get("message", final_reply)
+                        ids = parsed.get("job_ids", [])
+                        reply_job_ids = ids if isinstance(ids, list) else []
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+
                 loop.call_soon_threadsafe(
                     queue.put_nowait,
-                    f"data: {json.dumps({'type': 'reply', 'reply': final_reply, 'agents_used': agent_steps})}\n\n",
+                    f"data: {json.dumps({'type': 'reply', 'reply': reply_text, 'job_ids': reply_job_ids, 'agents_used': agent_steps})}\n\n",
                 )
-                if final_reply:
-                    _fire_orchestrator_evaluation(req.message, final_reply, agents_used)
+                if reply_text:
+                    _fire_orchestrator_evaluation(req.message, reply_text, agents_used)
             except Exception:
                 log.exception("Agent streaming failed for user %s", user_id)
                 loop.call_soon_threadsafe(
