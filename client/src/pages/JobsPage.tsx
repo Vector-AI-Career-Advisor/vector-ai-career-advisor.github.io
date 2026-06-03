@@ -94,6 +94,26 @@ export default function JobsPage() {
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
+  const [chatOpen, setChatOpen]   = useState(false)
+  const [chatWidth, setChatWidth] = useState(700)
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX     = e.clientX
+    const startWidth = chatWidth
+
+    const onMove = (e: MouseEvent) => {
+      const newWidth = Math.max(280, Math.min(700, startWidth + startX - e.clientX))
+      setChatWidth(newWidth)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedKeyword(keyword), 350)
     return () => clearTimeout(t)
@@ -223,7 +243,7 @@ export default function JobsPage() {
     <div className="jobs-root">
       <nav className="navbar">
         <div className="navbar-brand">
-          <img src="/icon.ico" alt="Vector" className="logo-icon" style={{ width: '20px', height: '20px' }} />
+          <img src="/icon.ico" alt="Vector" className="logo-icon" style={{ width: '26px', height: '26px' }} />
           <span className="logo-text">Vector</span>
         </div>
 
@@ -287,7 +307,23 @@ export default function JobsPage() {
         </div>
 
         <div className="navbar-right">
-         
+          <button
+            className={`agent-pane-toggle${chatOpen ? ' active' : ''}`}
+            onClick={() => setChatOpen(o => !o)}
+            title="Career Agent"
+            aria-label="Toggle agent chat"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v3"/>
+              <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+              <rect x="2" y="5" width="20" height="14" rx="6"/>
+              <circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+              <circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+              <path d="M9 15 Q12 17.5 15 15"/>
+              <path d="M2 10H0"/><path d="M22 10h2"/>
+            </svg>
+          </button>
           <ThemeToggle />
           <div className="navbar-divider" />
           <button className="btn-logout" onClick={handleLogout}>
@@ -296,6 +332,7 @@ export default function JobsPage() {
         </div>
       </nav>
 
+      <div className="page-body" style={{ paddingRight: chatOpen ? chatWidth : 0 }}>
       {/* ── Statistics view ── */}
       {activeTab === 'stats' && (
         <div className="stats-view">
@@ -604,14 +641,17 @@ export default function JobsPage() {
             </div>
           </div>
 
-          {/* RIGHT: agents chat panel */}
-          <div className="right-column">
-            <AgentChat selectedJob={selected} jobs={jobs} />
-          </div>
         </div>
       )}
 
-      <JobDrawer job={selected} onClose={() => setSelected(null)} />
+      </div>
+
+      <div className={`agent-pane${chatOpen ? ' open' : ''}`} style={{ width: chatWidth }}>
+        <div className="agent-pane-handle" onMouseDown={handleDragStart} />
+        <AgentChat selectedJob={selected} jobs={jobs} onSelectJob={setSelected} />
+      </div>
+
+      <JobDrawer job={selected} onClose={() => setSelected(null)} chatWidth={chatOpen ? chatWidth : 0} />
 
       {/* ── Save Preset Modal ── */}
       {showSaveModal && (

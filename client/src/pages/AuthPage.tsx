@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth'
 import api from '../api/client'
 import './AuthPage.css'
 
-const LOGO_SRC = 'data:image/png;base64,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'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 
@@ -134,8 +133,7 @@ export default function AuthPage() {
 
         <div className="auth-hero-content">
           <div className="auth-logo">
-            <img src={LOGO_SRC} alt="Vector logo" />
-            <span className="logo-text">Vector</span>
+            <img src="/full-logo.png" alt="Vector" />
           </div>
 
           <p className="auth-eyebrow">Your career trajectory, defined</p>
@@ -164,7 +162,7 @@ export default function AuthPage() {
               <div className="feat-icon pink"><IconChat /></div>
               <div className="feat-body">
                 <strong>Role-specific interview preparation</strong>
-                <span>Practice with questions from your target company, supplemented by AI-generated prompts.</span>
+                <span>Real questions from your target company, supplemented by AI-generated prompts.</span>
               </div>
             </div>
             <div className="auth-feat">
@@ -183,12 +181,12 @@ export default function AuthPage() {
 
         {/* Theme toggle */}
         <button
-          className="theme-toggle"
+          className="auth-theme-toggle"
           onClick={toggleTheme}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
         >
           {theme === 'dark' ? <IconSun /> : <IconMoon />}
-          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
 
         <div className="auth-card">
@@ -246,6 +244,13 @@ export default function AuthPage() {
               </svg>
               Google
             </a>
+            <button className="btn-social" type="button" disabled>
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="#0A66C2"/>
+                <path d="M7.5 9.5h-3v9h3v-9zM6 8.2A1.7 1.7 0 1 0 6 4.8 1.7 1.7 0 0 0 6 8.2zM19.5 13c0-2.2-1.1-3.7-3-3.7-1 0-1.8.5-2.2 1.2V9.5h-3v9h3v-4.8c0-1.1.5-1.9 1.5-1.9s1.7.7 1.7 2v4.7h3V13z" fill="white"/>
+              </svg>
+              LinkedIn
+            </button>
           </div>
 
           <p className="auth-legal">

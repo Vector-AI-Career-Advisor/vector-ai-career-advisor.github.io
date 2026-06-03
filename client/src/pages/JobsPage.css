@@ -31,7 +31,7 @@
 
 .logo-text {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -87,26 +87,14 @@
 }
 
 .theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  border-radius: 20px;
-  border: 1px solid var(--border2);
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 0.8rem;
-  font-family: var(--font-mono);
-  font-weight: 600;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: color 0.15s, border-color 0.15s, background 0.15s;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
-  white-space: nowrap;
-  height: 32px;
-  margin-right: 7rem;
 }
 .theme-toggle:hover {
-  background: var(--surface);
-  border-color: var(--accent);
+  color: var(--text); border-color: var(--border2);
 }
 
 /* ── Nav tab buttons ── */
@@ -157,10 +145,16 @@
   height: calc(100vh - 60px);
 }
 
-/* ── Two-column split ── */
+.page-body {
+  flex: 1;
+  overflow: hidden;
+  transition: padding-right 0.2s ease;
+}
+
+/* ── Single-column layout ── */
 .page-columns {
-  display: grid;
-  grid-template-columns: 1fr 360px;
+  display: flex;
+  flex-direction: column;
   height: calc(100vh - 60px);
   overflow: hidden;
 }
@@ -170,12 +164,11 @@
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  width: 100%;
 }
 .left-column .jobs-layout { flex: 1; overflow: hidden; height: 100%; }
 .left-column .jobs-main   { overflow-y: auto; height: 100%; }
 .left-column .jobs-sidebar { overflow-y: auto; height: 100%; }
-
-.right-column { height: 100%; overflow: hidden; }
 
 /* ── Layout ── */
 .jobs-layout {
@@ -506,6 +499,54 @@
 }
 .tag-remove:hover { opacity: 1; }
 
+/* ── Agent pane ── */
+.agent-pane {
+  position: fixed;
+  top: 60px;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+.agent-pane.open {
+  transform: translateX(0);
+}
+.agent-pane-handle {
+  width: 5px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+}
+.agent-pane-handle:hover {
+  background: rgba(124, 90, 247, 0.25);
+}
+.agent-pane > .agent-chat {
+  flex: 1;
+  min-width: 0;
+  border-left: none;
+}
+
+.agent-pane-toggle {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface2);
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: color 0.15s, border-color 0.15s, background 0.15s;
+  cursor: pointer;
+}
+.agent-pane-toggle:hover {
+  color: var(--text); border-color: var(--border2);
+}
+.agent-pane-toggle.active {
+  color: var(--accent2);
+  background: rgba(124, 90, 247, 0.1);
+  border-color: rgba(124, 90, 247, 0.3);
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .navbar {
@@ -527,8 +568,7 @@
   justify-content: flex-end;
   min-width: 220px;
 }
-  .page-columns { grid-template-columns: 1fr; grid-template-rows: 1fr auto; height: auto; }
-  .right-column { height: 480px; border-top: 1px solid var(--border); }
+  .page-columns { height: auto; }
   .jobs-layout { grid-template-columns: 1fr; }
   .jobs-sidebar {
     position: static; height: auto;

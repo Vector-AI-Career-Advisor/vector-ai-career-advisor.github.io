@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Job } from '../api/jobs'
+import { Job, fetchJob } from '../api/jobs'
 import { uploadResume, getMyResume } from '../api/resumes'
 import './AgentChat.css'
 
@@ -24,32 +24,41 @@ function SimpleMarkdown({ children }: { children: string }) {
 
 type Role = 'user' | 'agent' | 'system'
 
+interface AgentStep {
+  name: string
+  description: string
+}
+
 interface Message {
   id: string
   role: Role
   text: string
   timestamp: Date
-  agentsUsed?: string[]
+  agentsUsed?: AgentStep[]
+  jobIds?: string[]
 }
 
 const AGENT_LABELS: Record<string, string> = {
-  sql_agent:         'Job Search',
-  resume_agent:      'Resume',
-  job_advisor_agent: 'Career Advisor',
+  db_agent:          'Job Search Agent',
+  resume_agent:      'Resume Agent',
+  job_advisor_agent: 'Career Advisor Agent',
+  interview_agent:   'Interview Prep Agent',
 }
 const agentLabel = (name: string) => AGENT_LABELS[name] ?? name
+const formatDesc = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) + '...' : ''
 
 interface Props {
   selectedJob: Job | null
   jobs?: Job[]
+  onSelectJob?: (job: Job) => void
 }
 
 async function callAgent(
   message: string,
   selectedJob: Job | null,
   history: Message[],
-  onPlanning: (agents: string[]) => void,
-): Promise<{ reply: string; agentsUsed: string[] }> {
+  onPlanning: (agents: AgentStep[]) => void,
+): Promise<{ reply: string; agentsUsed: AgentStep[]; jobIds: string[] }> {
   const token = localStorage.getItem('token')
   const res = await fetch('/agents/chat', {
     method: 'POST',
@@ -79,7 +88,8 @@ async function callAgent(
   const decoder = new TextDecoder()
   let buffer = ''
   let reply = ''
-  let agentsUsed: string[] = []
+  let agentsUsed: AgentStep[] = []
+  let jobIds: string[] = []
 
   while (true) {
     const { done, value } = await reader.read()
@@ -100,6 +110,7 @@ async function callAgent(
         } else if (event.type === 'reply') {
           reply = event.reply
           agentsUsed = event.agents_used ?? []
+          jobIds = event.job_ids ?? []
         } else if (event.type === 'error') {
           throw new Error(event.detail ?? 'Agent error')
         }
@@ -110,7 +121,39 @@ async function callAgent(
     }
   }
 
-  return { reply, agentsUsed }
+  return { reply, agentsUsed, jobIds }
+}
+
+// ─── Job mini-card ────────────────────────────────────────────────────────────
+
+function JobMiniCard({ jobId, onOpen }: { jobId: string; onOpen?: (job: Job) => void }) {
+  const [job, setJob] = useState<Job | null>(null)
+
+  useEffect(() => {
+    fetchJob(jobId).then(setJob).catch(() => {})
+  }, [jobId])
+
+  if (!job) return (
+    <div className="job-mini-card job-mini-card--loading">
+      <div className="job-mini-card-shimmer" />
+    </div>
+  )
+
+  return (
+    <div className="job-mini-card">
+      <div className="job-mini-card-info">
+        <p className="job-mini-card-title">{job.title}</p>
+        <p className="job-mini-card-meta">
+          {[job.company, job.location].filter(Boolean).join(' · ')}
+        </p>
+      </div>
+      {onOpen && (
+        <button className="job-mini-card-btn" onClick={() => onOpen(job)}>
+          Open
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ─── Suggested prompts ───────────────────────────────────────────────────────
@@ -124,11 +167,11 @@ const SUGGESTIONS = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function AgentChat({ selectedJob, jobs = [] }: Props) {
+export default function AgentChat({ selectedJob, jobs = [], onSelectJob }: Props) {
   const [messages, setMessages]         = useState<Message[]>([])
   const [input, setInput]               = useState('')
   const [isTyping, setIsTyping]         = useState(false)
-  const [pendingAgents, setPendingAgents] = useState<string[]>([])
+  const [pendingAgents, setPendingAgents] = useState<AgentStep[]>([])
   const [error, setError]               = useState<string | null>(null)
   const [resumeFilename, setResumeFilename] = useState<string | null>(null)
   const [uploadState, setUploadState]   = useState<'idle' | 'uploading' | 'error'>('idle')
@@ -149,25 +192,6 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  // When a new job is selected, add a context message
-  useEffect(() => {
-    if (!selectedJob) return
-    setMessages(prev => {
-      const alreadyNotified = prev.some(
-        m => m.role === 'agent' && m.text.includes(selectedJob.id)
-      )
-      if (alreadyNotified) return prev
-      return [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'agent',
-          text: `I noticed you opened **${selectedJob.title}** at ${selectedJob.company}. Ask me anything about it!`,
-          timestamp: new Date(),
-        },
-      ]
-    })
-  }, [selectedJob])
 
   const send = async (text: string) => {
     const trimmed = text.trim()
@@ -187,7 +211,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     setError(null)
 
     try {
-      const { reply, agentsUsed } = await callAgent(
+      const { reply, agentsUsed, jobIds } = await callAgent(
         trimmed,
         selectedJob,
         messages,
@@ -196,7 +220,7 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
       setPendingAgents([])
       setMessages(prev => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed },
+        { id: crypto.randomUUID(), role: 'agent', text: reply, timestamp: new Date(), agentsUsed, jobIds },
       ])
     } catch {
       setPendingAgents([])
@@ -240,22 +264,18 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
   }
 
   const isEmpty = messages.length === 0
+  const lastAgentId = [...messages].reverse().find(m => m.role === 'agent')?.id
 
   return (
     <div className="agent-chat">
       {/* Header */}
       <div className="agent-header">
-        <div className="agent-avatar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/>
-            <circle cx="9" cy="13" r="1" fill="currentColor"/>
-            <circle cx="15" cy="13" r="1" fill="currentColor"/>
-          </svg>
-        </div>
         <div>
           <p className="agent-name">Career Agent</p>
-          <p className="agent-status">{isTyping ? 'Typing…' : 'Online'}</p>
+          <p className="agent-status">
+            <span className={`status-dot ${error ? 'offline' : 'online'}`} />
+            {isTyping ? 'Typing…' : error ? 'Offline' : 'Online'}
+          </p>
         </div>
 
         <div className="agent-header-pills">
@@ -285,7 +305,18 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
       <div className="agent-messages">
         {isEmpty ? (
           <div className="agent-empty">
-            <div className="agent-empty-icon">◈</div>
+            <div className="agent-empty-icon">
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v3"/>
+                <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                <rect x="2" y="5" width="20" height="14" rx="6"/>
+                <circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                <circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                <path d="M9 15 Q12 17.5 15 15"/>
+                <path d="M2 10H0"/><path d="M22 10h2"/>
+              </svg>
+            </div>
             <p className="agent-empty-title">Your career agent</p>
             <p className="agent-empty-sub">
               Ask about any job, get CV tips, salary ranges, or let the agent
@@ -307,18 +338,17 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                   <div className="system-message">{msg.text}</div>
                 ) : msg.role === 'agent' ? (
                   <div className="message-content">
-                    {msg.agentsUsed && msg.agentsUsed.length > 0 && (
-                      <div className="routing-trace">
-                        <span className="routing-trace-via">via</span>
-                        {msg.agentsUsed.map(a => (
-                          <span key={a} className="routing-chip">{agentLabel(a)}</span>
-                        ))}
-                      </div>
-                    )}
                     <div className="bubble agent">
                       <div className="msg-text">
                         <SimpleMarkdown>{msg.text}</SimpleMarkdown>
                       </div>
+                      {msg.jobIds && msg.jobIds.length > 0 && (
+                        <div className="job-mini-cards">
+                          {msg.jobIds.map(id => (
+                            <JobMiniCard key={id} jobId={id} onOpen={onSelectJob} />
+                          ))}
+                        </div>
+                      )}
                       <span className="msg-time">
                         {msg.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
@@ -326,6 +356,20 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                         })}
                       </span>
                     </div>
+                    {msg.id === lastAgentId && !isTyping && (
+                      <div className="agent-bubble-avatar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2v3"/>
+                          <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                          <rect x="2" y="5" width="20" height="14" rx="6"/>
+                          <circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                          <circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                          <path d="M9 15 Q12 17.5 15 15"/>
+                          <path d="M2 10H0"/><path d="M22 10h2"/>
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="bubble user">
@@ -349,20 +393,23 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
               <div className="message-row agent">
                 <div className="message-content">
                   {pendingAgents.length > 0 && (
-                    <div className="routing-trace">
-                      <span className="routing-trace-via">via</span>
-                      {pendingAgents.map(a => (
-                        <span key={a} className="routing-chip routing-chip-pending">
-                          {agentLabel(a)}
-                        </span>
+                    <div className="agent-chain">
+                      {pendingAgents.map((a, i) => (
+                        <div key={a.name} className="agent-chain-row">
+                          <div className="agent-chain-track">
+                            <div className="agent-chain-dot pending" />
+                            {i < pendingAgents.length - 1 && <div className="agent-chain-line pending" />}
+                          </div>
+                          <div className="agent-chain-info">
+                            <span className="agent-chain-label pending">{agentLabel(a.name)}</span>
+                            {a.description && <span className="agent-chain-desc pending">{formatDesc(a.description)}</span>}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
                   <div className="bubble agent typing-indicator">
                     <span /><span /><span />
-                    {pendingAgents.length === 0 && (
-                      <span className="routing-label">Routing…</span>
-                    )}
                   </div>
                 </div>
               </div>

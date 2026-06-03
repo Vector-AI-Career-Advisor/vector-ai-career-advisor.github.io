@@ -1,4 +1,4 @@
-"""SQL Agent — handles all structured DB queries and job searches."""
+"""Interview Agent — finds real past interview questions and generates practice questions."""
 from __future__ import annotations
 
 import logging
@@ -13,30 +13,31 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
-from .tools.db_tools import DB_TOOLS
-from .prompts import SQL_AGENT_PROMPT
+from server.agents.interview.interview_tools import INTERVIEW_TOOLS
+from server.agents.interview.prompt import PROMPT
 
 load_dotenv()
 
-log = logging.getLogger("agents.sql_agent")
+log = logging.getLogger("agents.interview_agent")
+
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
 
 
-def build_sql_agent():
+def build_interview_agent():
     base = ChatAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
         model=os.getenv("ANTHROPIC_MODEL"),
-        max_tokens=400,
+        max_tokens=1200,
     )
-    llm_force = base.bind_tools(DB_TOOLS, tool_choice="any")
-    llm_auto  = base.bind_tools(DB_TOOLS)
+    llm_force = base.bind_tools(INTERVIEW_TOOLS, tool_choice="any")
+    llm_auto  = base.bind_tools(INTERVIEW_TOOLS)
 
     def assistant(state: State):
         has_results = any(isinstance(m, ToolMessage) for m in state["messages"])
         llm = llm_auto if has_results else llm_force
-        prompt = SQL_AGENT_PROMPT.format(today=date.today().strftime("%B %d, %Y"))
+        prompt = PROMPT.format(today=date.today().strftime("%B %d, %Y"))
         messages = [SystemMessage(content=prompt)] + state["messages"]
         return {"messages": [llm.invoke(messages)]}
 
@@ -50,7 +51,7 @@ def build_sql_agent():
 
     graph = StateGraph(State)
     graph.add_node("assistant", assistant)
-    graph.add_node("tools", ToolNode(DB_TOOLS))
+    graph.add_node("tools", ToolNode(INTERVIEW_TOOLS))
     graph.set_entry_point("assistant")
     graph.add_conditional_edges("assistant", route, {"tools": "tools", END: END})
     graph.add_edge("tools", "assistant")
@@ -58,20 +59,19 @@ def build_sql_agent():
     return graph.compile()
 
 
-# Singleton — built once and reused by the orchestrator tool wrapper.
-_sql_agent = None
+_interview_agent = None
 
 
-def get_sql_agent():
-    global _sql_agent
-    if _sql_agent is None:
-        _sql_agent = build_sql_agent()
-    return _sql_agent
+def get_interview_agent():
+    global _interview_agent
+    if _interview_agent is None:
+        _interview_agent = build_interview_agent()
+    return _interview_agent
 
 
-def run_sql_agent(query: str, history: list | None = None) -> str:
+def run_interview_agent(query: str, history: list | None = None) -> str:
     """Entry point called by the orchestrator tool wrapper."""
-    agent = get_sql_agent()
+    agent = get_interview_agent()
     messages = list(history) if history else []
     messages.append(HumanMessage(content=query))
     result = agent.invoke({"messages": messages})

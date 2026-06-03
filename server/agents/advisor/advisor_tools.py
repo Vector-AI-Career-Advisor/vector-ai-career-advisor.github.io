@@ -4,7 +4,7 @@ Thin re-exports of the two DB tools the advisor needs.
 Keeping them separate means the advisor's ToolNode only binds
 what it should have access to.
 """
-from .db_tools import get_job_details, top_skills
-from .course_tools import recommend_courses 
+from server.agents.data.db_tools import get_job_details, top_skills
+from server.agents.advisor.course_tools import recommend_courses
 
 ADVISOR_TOOLS = [get_job_details, top_skills, recommend_courses]

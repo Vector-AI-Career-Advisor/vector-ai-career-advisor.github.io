@@ -61,7 +61,7 @@ KEYWORDS = [
     "data analyst", "data engineer", "data scientist", "ai", "machine learning",
     "deep learning", "nlp", "computer vision", "big data", "it", "bi",
     "cloud", "aws", "azure", "docker", "kubernetes", "devops", "ci cd",
-    "database", "sql", "nosql", "mongodb", "postgres", "mysql",
+    "database", "data", "nosql", "mongodb", "postgres", "mysql",
     "security", "cyber", "infosec", "penetration", "appsec",
     "android", "ios", "mobile", "flutter", "react native",
     "qa", "automation",

@@ -51,7 +51,7 @@ PYTHONPATH=. .venv/bin/pytest server/tests/    # Run backend tests
 ### Agent system (`/server/agents`)
 
 The orchestrator (`orchestrator.py`) classifies user intent and routes to one of four specialist agents, each exposed as a `@tool`:
-- `sql_agent.py` — structured DB queries for job search and stats
+- `db_agent.py` — structured DB queries for job search and stats
 - `resume_agent.py` — resume upload, tailoring, gap analysis
 - `job_advisor_agent.py` — job recommendations
 - `evaluator_agent.py` — candidate-job fit scoring

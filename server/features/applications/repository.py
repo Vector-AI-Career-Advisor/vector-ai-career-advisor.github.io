@@ -1,5 +1,5 @@
 from typing import List, Optional
-from db.postgres import get_connection, fetch_applications_by_user, add_application, update_application_status
+from server.db.postgres import get_connection, fetch_applications_by_user, add_application, update_application_status
 
 
 def get_applications(user_id: int, status: Optional[str] = None) -> List[dict]:
