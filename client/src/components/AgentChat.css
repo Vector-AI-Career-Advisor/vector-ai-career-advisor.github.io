@@ -28,7 +28,13 @@
 }
 
 .agent-name { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; }
-.agent-status { font-size: 11px; color: var(--muted); margin: 0; }
+.agent-status { font-size: 11px; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 5px; }
+
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.online  { background: var(--green); box-shadow: 0 0 4px var(--green); }
+.status-dot.offline { background: var(--red);   box-shadow: 0 0 4px var(--red); }
 
 .agent-header-pills { margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .agent-context-pill {
@@ -52,7 +58,7 @@
   justify-content: center; text-align: center;
   height: 100%; padding: 24px 16px; gap: 8px;
 }
-.agent-empty-icon { font-size: 26px; color: var(--muted); margin-bottom: 4px; opacity: 0.5; }
+.agent-empty-icon { color: var(--accent2); margin-bottom: 8px; opacity: 0.6; }
 .agent-empty-title { font-size: 14px; font-weight: 600; color: var(--text); margin: 0; }
 .agent-empty-sub { font-size: 12px; color: var(--muted); margin: 0; line-height: 1.55; max-width: 230px; }
 
@@ -121,6 +127,20 @@
 
 .message-content .bubble {
   max-width: 100%;
+}
+
+.agent-bubble-avatar {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: rgba(48, 191, 184, 0.12);
+  border: 1px solid rgba(48, 191, 184, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent2);
+  opacity: 0.85;
+  margin-left: -14px;
 }
 
 /* ── Agent chain ─────────────────────────────────────────────────────────── */

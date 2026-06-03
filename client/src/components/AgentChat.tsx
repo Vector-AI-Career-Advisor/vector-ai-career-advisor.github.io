@@ -247,22 +247,18 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
   }
 
   const isEmpty = messages.length === 0
+  const lastAgentId = [...messages].reverse().find(m => m.role === 'agent')?.id
 
   return (
     <div className="agent-chat">
       {/* Header */}
       <div className="agent-header">
-        <div className="agent-avatar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V10a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/>
-            <circle cx="9" cy="13" r="1" fill="currentColor"/>
-            <circle cx="15" cy="13" r="1" fill="currentColor"/>
-          </svg>
-        </div>
         <div>
           <p className="agent-name">Career Agent</p>
-          <p className="agent-status">{isTyping ? 'Typing…' : 'Online'}</p>
+          <p className="agent-status">
+            <span className={`status-dot ${error ? 'offline' : 'online'}`} />
+            {isTyping ? 'Typing…' : error ? 'Offline' : 'Online'}
+          </p>
         </div>
 
         <div className="agent-header-pills">
@@ -292,7 +288,18 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
       <div className="agent-messages">
         {isEmpty ? (
           <div className="agent-empty">
-            <div className="agent-empty-icon">◈</div>
+            <div className="agent-empty-icon">
+              <svg width="52" height="52" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v3"/>
+                <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                <rect x="2" y="5" width="20" height="14" rx="6"/>
+                <circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                <circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                <path d="M9 15 Q12 17.5 15 15"/>
+                <path d="M2 10H0"/><path d="M22 10h2"/>
+              </svg>
+            </div>
             <p className="agent-empty-title">Your career agent</p>
             <p className="agent-empty-sub">
               Ask about any job, get CV tips, salary ranges, or let the agent
@@ -325,6 +332,20 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
                         })}
                       </span>
                     </div>
+                    {msg.id === lastAgentId && !isTyping && (
+                      <div className="agent-bubble-avatar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                          stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2v3"/>
+                          <circle cx="12" cy="2" r="1" fill="currentColor" stroke="none"/>
+                          <rect x="2" y="5" width="20" height="14" rx="6"/>
+                          <circle cx="9" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                          <circle cx="15" cy="11" r="1.8" fill="currentColor" stroke="none"/>
+                          <path d="M9 15 Q12 17.5 15 15"/>
+                          <path d="M2 10H0"/><path d="M22 10h2"/>
+                        </svg>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="bubble user">
