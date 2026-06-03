@@ -116,9 +116,20 @@ def run_load_postgres(jobs: List[dict]) -> int:
         log.info("No jobs to insert into PostgreSQL.")
         return 0
 
+    seen: set = set()
+    unique_jobs: List[dict] = []
+    for job in jobs:
+        job_id = job.get("id")
+        if job_id and job_id in seen:
+            log.warning("Duplicate job ID in batch, skipping: %s", job_id)
+            continue
+        if job_id:
+            seen.add(job_id)
+        unique_jobs.append(job)
+
     conn     = get_connection()
     init_db(conn)
-    inserted = insert_jobs(conn, jobs)
+    inserted = insert_jobs(conn, unique_jobs)
     conn.close()
     return inserted
 
