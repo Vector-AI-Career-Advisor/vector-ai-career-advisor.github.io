@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
 from server.core.security import get_current_user
 from server.core.logging import set_session_user, clear_session_user
@@ -25,7 +25,7 @@ router = APIRouter()
 
 # ── Evaluation ────────────────────────────────────────────────────────────
 
-def _fire_orchestrator_evaluation(user_message: str, final_reply: str, agents_used: List[str]) -> None:
+def _fire_orchestrator_evaluation(user_message: str, final_reply: str, agents_used: List[str], raw_output: str = "", agent_outputs: dict = None) -> None:
     """Evaluate the orchestrator's full response in a background thread.
     ContextVar is copied at thread start so the session log is inherited."""
     def _run():
@@ -34,6 +34,8 @@ def _fire_orchestrator_evaluation(user_message: str, final_reply: str, agents_us
                 user_message=user_message,
                 final_response=final_reply,
                 agents_used=agents_used,
+                raw_output=raw_output,
+                agent_outputs=agent_outputs or {},
             ))
             conn = get_connection()
             try:
@@ -112,6 +114,7 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
             set_session_user(int(user_id))
             agents_used: List[str] = []
             agent_steps: List[dict] = []   # [{name, description}, ...] for the UI
+            agent_outputs: dict = {}        # {agent_name: raw_output} for evaluator
             final_reply = ""
             try:
                 token = conversation_history.set(lc_history[:-1])
@@ -125,6 +128,10 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                 return
             try:
                 for chunk in agent.stream({"messages": lc_history}, stream_mode="updates"):
+                    if "tools" in chunk:
+                        for msg in chunk["tools"].get("messages", []):
+                            if isinstance(msg, ToolMessage) and msg.name:
+                                agent_outputs[msg.name] = str(msg.content)
                     if "coordinator" not in chunk:
                         continue
                     for msg in chunk["coordinator"].get("messages", []):
@@ -172,7 +179,8 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                     f"data: {json.dumps({'type': 'reply', 'reply': reply_text, 'job_ids': reply_job_ids, 'agents_used': agent_steps})}\n\n",
                 )
                 if reply_text:
-                    _fire_orchestrator_evaluation(req.message, reply_text, agents_used)
+                    raw_output = json.dumps({"message": reply_text, "job_ids": reply_job_ids})
+                    _fire_orchestrator_evaluation(req.message, reply_text, agents_used, raw_output, agent_outputs)
             except Exception:
                 log.exception("Agent streaming failed for user %s", user_id)
                 loop.call_soon_threadsafe(

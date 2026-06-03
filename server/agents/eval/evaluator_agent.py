@@ -22,9 +22,11 @@ load_dotenv()
 
 @dataclass
 class EvaluationInput:
-    user_message: str       # the user's original request
-    final_response: str     # the orchestrator's final reply
-    agents_used: list[str]  # routing path, e.g. ["db_agent", "job_advisor_agent"]
+    user_message: str           # the user's original request
+    final_response: str         # extracted message text (for logging/storage)
+    agents_used: list[str]      # routing path, e.g. ["db_agent", "job_advisor_agent"]
+    raw_output: str = ""        # full JSON string {"message": "...", "job_ids": [...]}
+    agent_outputs: dict = None  # {agent_name: raw_output_string} for each specialist called
 
 
 @dataclass
@@ -76,10 +78,21 @@ def get_evaluator_agent():
 def run_evaluator_agent(evaluation_input: EvaluationInput) -> EvaluationResult:
     """Evaluate the orchestrator's response and return a structured EvaluationResult."""
     routing_path = " → ".join(evaluation_input.agents_used) if evaluation_input.agents_used else "none"
+    orchestrator_output = evaluation_input.raw_output or evaluation_input.final_response
+    agent_outputs = evaluation_input.agent_outputs or {}
+
+    agent_outputs_section = ""
+    if agent_outputs:
+        lines = []
+        for name, output in agent_outputs.items():
+            lines.append(f"  [{name}]:\n  {output}")
+        agent_outputs_section = "\nSpecialist agent outputs:\n" + "\n".join(lines) + "\n"
+
     query = (
         f"User request: {evaluation_input.user_message}\n"
         f"Agents invoked: {routing_path}\n"
-        f"Final response: {evaluation_input.final_response}\n"
+        f"{agent_outputs_section}"
+        f"Orchestrator JSON output: {orchestrator_output}\n"
     )
 
     agent = get_evaluator_agent()
