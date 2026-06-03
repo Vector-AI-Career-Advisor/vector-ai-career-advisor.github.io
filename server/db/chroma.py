@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import threading
 from typing import Dict, List, Optional
 import chromadb
 from chromadb.config import Settings
@@ -26,17 +27,28 @@ _UPSERT_BATCH_SIZE = 500
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
+_chroma_client: chromadb.PersistentClient | None = None
+_chroma_collection: chromadb.Collection | None = None
+_chroma_lock = threading.Lock()
+
+
 def init_chroma() -> chromadb.Collection:
-    client = chromadb.PersistentClient(
-        path=CHROMA_PERSIST_DIR,
-        settings=Settings(anonymized_telemetry=False),
-    )
-    collection = client.get_or_create_collection(
-        name=CHROMA_COLLECTION,
-        metadata={"hnsw:space": "cosine"},
-    )
-    log.info("ChromaDB collection '%s' | %d vectors.", CHROMA_COLLECTION, collection.count())
-    return collection
+    global _chroma_client, _chroma_collection
+    if _chroma_collection is not None:
+        return _chroma_collection
+    with _chroma_lock:
+        if _chroma_collection is not None:
+            return _chroma_collection
+        _chroma_client = chromadb.PersistentClient(
+            path=CHROMA_PERSIST_DIR,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        _chroma_collection = _chroma_client.get_or_create_collection(
+            name=CHROMA_COLLECTION,
+            metadata={"hnsw:space": "cosine"},
+        )
+        log.info("ChromaDB collection '%s' | %d vectors.", CHROMA_COLLECTION, _chroma_collection.count())
+    return _chroma_collection
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
