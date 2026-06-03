@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import threading
 from typing import List, Optional
 
@@ -161,18 +162,27 @@ async def chat(req: ChatRequest, user_id: str = Depends(get_current_user)):
                 reply_text = final_reply
                 reply_job_ids: list = []
                 if final_reply:
-                    try:
-                        raw = final_reply.strip()
-                        if raw.startswith("```"):
-                            raw = raw.split("\n", 1)[-1]
-                            raw = raw.rsplit("```", 1)[0]
-                            raw = raw.strip()
-                        parsed = json.loads(raw)
-                        reply_text = parsed.get("message", final_reply)
-                        ids = parsed.get("job_ids", [])
+                    def _try_parse(s: str):
+                        try:
+                            parsed = json.loads(s)
+                            return parsed.get("message", final_reply), parsed.get("job_ids", [])
+                        except (json.JSONDecodeError, AttributeError):
+                            return None
+
+                    raw = final_reply.strip()
+                    if raw.startswith("```"):
+                        raw = raw.split("\n", 1)[-1]
+                        raw = raw.rsplit("```", 1)[0].strip()
+
+                    result = _try_parse(raw)
+                    if result is None:
+                        match = re.search(r'\{.*\}', raw, re.DOTALL)
+                        if match:
+                            result = _try_parse(match.group())
+
+                    if result is not None:
+                        reply_text, ids = result
                         reply_job_ids = ids if isinstance(ids, list) else []
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
 
                 loop.call_soon_threadsafe(
                     queue.put_nowait,

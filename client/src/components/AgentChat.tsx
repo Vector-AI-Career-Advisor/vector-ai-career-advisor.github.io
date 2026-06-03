@@ -45,7 +45,12 @@ const AGENT_LABELS: Record<string, string> = {
   interview_agent:   'Interview Prep Agent',
 }
 const agentLabel = (name: string) => AGENT_LABELS[name] ?? name
-const formatDesc = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) + '...' : ''
+const formatDesc = (s: string) => {
+  if (!s) return ''
+  const words = s.trim().split(/\s+/)
+  const truncated = words.slice(0, 6).join(' ')
+  return truncated.charAt(0).toUpperCase() + truncated.slice(1) + (words.length > 6 ? '…' : '…')
+}
 
 interface Props {
   selectedJob: Job | null

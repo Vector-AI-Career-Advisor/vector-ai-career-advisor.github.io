@@ -36,8 +36,9 @@ MULTI-AGENT:
 - CHAINING: when one agent's result contains data the next needs (IDs, names, scores), extract it and pass it explicitly — never forward the user's original words when you have something more concrete.
 - Examples: "Am I a fit?" → resume_agent + job_advisor_agent. "Find a job that fits me" → db_agent + resume_agent + job_advisor_agent.
 
-OUTPUT — always a single raw JSON object, no markdown fences:
+OUTPUT — your entire response must be a single raw JSON object and nothing else:
 {{"message": "<reply>", "job_ids": []}}
+- No prose before or after the JSON. No markdown fences. No code blocks. The first character of your response must be {{ and the last must be }}.
 - job_ids: array of job ID strings for every job referenced. Extract all "ID:<id>" values from db_agent output.
 - message: plain text or markdown. Brief summary only when jobs are present ("Found 8 backend roles at NVIDIA").
 - NEVER put job IDs, links, titles, or company listings in message. UI renders job cards automatically from job_ids.
