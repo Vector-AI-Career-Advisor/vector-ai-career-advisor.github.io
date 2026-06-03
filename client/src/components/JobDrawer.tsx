@@ -6,9 +6,10 @@ import './JobDrawer.css'
 interface Props {
   job: Job | null
   onClose: () => void
+  chatWidth?: number
 }
 
-export default function JobDrawer({ job, onClose }: Props) {
+export default function JobDrawer({ job, onClose, chatWidth = 0 }: Props) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [applying, setApplying] = useState(false)
   const [applied, setApplied] = useState(false)
@@ -21,6 +22,10 @@ export default function JobDrawer({ job, onClose }: Props) {
   }, [job?.id])
 
   if (!job) return null
+
+  const availableWidth = window.innerWidth - chatWidth
+  const drawerWidth = Math.min(680, Math.max(420, availableWidth - 60))
+  const drawerLeft = Math.max(12, (availableWidth - drawerWidth) / 2)
 
   function handleApplyClick() {
     if (job?.url) window.open(job.url, '_blank', 'noopener,noreferrer')
@@ -45,8 +50,8 @@ export default function JobDrawer({ job, onClose }: Props) {
 
   return (
     <>
-      <div className="drawer-overlay" onClick={onClose} />
-      <aside className="drawer">
+      <div className="drawer-overlay" style={{ right: chatWidth }} onClick={onClose} />
+      <aside className="drawer" style={{ left: drawerLeft, width: drawerWidth }}>
         <div className="drawer-header">
           <button className="drawer-close" onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"

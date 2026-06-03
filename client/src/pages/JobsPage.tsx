@@ -651,7 +651,7 @@ export default function JobsPage() {
         <AgentChat selectedJob={selected} jobs={jobs} />
       </div>
 
-      <JobDrawer job={selected} onClose={() => setSelected(null)} />
+      <JobDrawer job={selected} onClose={() => setSelected(null)} chatWidth={chatOpen ? chatWidth : 0} />
 
       {/* ── Save Preset Modal ── */}
       {showSaveModal && (

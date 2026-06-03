@@ -1,20 +1,32 @@
 /* JobDrawer.css — unified with AuthPage aesthetic */
 
 .drawer-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-  z-index: 100; animation: fadeIn 0.2s ease;
+  position: fixed;
+  top: 60px; left: 0; bottom: 0;
+  /* right is set via inline style to leave the chat pane uncovered */
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  z-index: 45;
+  animation: fadeIn 0.2s ease;
 }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .drawer {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  width: min(520px, 100vw);
-  background: var(--surface); border-left: 1px solid var(--border);
-  z-index: 101; display: flex; flex-direction: column; overflow: hidden;
-  animation: slideIn 0.25s cubic-bezier(0.22,1,0.36,1);
+  position: fixed;
+  top: 70px;
+  bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  z-index: 50;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.2);
+  animation: windowIn 0.22s cubic-bezier(0.22,1,0.36,1);
 }
-@keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes windowIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
 
 /* Header */
 .drawer-header {

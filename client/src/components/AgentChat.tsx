@@ -156,25 +156,6 @@ export default function AgentChat({ selectedJob, jobs = [] }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isTyping])
 
-  // When a new job is selected, add a context message
-  useEffect(() => {
-    if (!selectedJob) return
-    setMessages(prev => {
-      const alreadyNotified = prev.some(
-        m => m.role === 'agent' && m.text.includes(selectedJob.id)
-      )
-      if (alreadyNotified) return prev
-      return [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'agent',
-          text: `I noticed you opened **${selectedJob.title}** at ${selectedJob.company}. Ask me anything about it!`,
-          timestamp: new Date(),
-        },
-      ]
-    })
-  }, [selectedJob])
 
   const send = async (text: string) => {
     const trimmed = text.trim()
