@@ -244,6 +244,13 @@ export default function AuthPage() {
               </svg>
               Google
             </a>
+            <button className="btn-social" type="button" disabled>
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="#0A66C2"/>
+                <path d="M7.5 9.5h-3v9h3v-9zM6 8.2A1.7 1.7 0 1 0 6 4.8 1.7 1.7 0 0 0 6 8.2zM19.5 13c0-2.2-1.1-3.7-3-3.7-1 0-1.8.5-2.2 1.2V9.5h-3v9h3v-4.8c0-1.1.5-1.9 1.5-1.9s1.7.7 1.7 2v4.7h3V13z" fill="white"/>
+              </svg>
+              LinkedIn
+            </button>
           </div>
 
           <p className="auth-legal">
