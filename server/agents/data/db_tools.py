@@ -1,6 +1,7 @@
 """DB Tools — all structured database query tools for the SQL Agent."""
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
@@ -10,6 +11,8 @@ from langchain.tools import tool
 
 from server.db.postgres import get_connection
 from server.db.chroma import init_chroma, search_jobs as chroma_search
+
+log = logging.getLogger(__name__)
 
 # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -42,8 +45,13 @@ def semantic_search_jobs(query: str, n_results: int = 5):
     Use for: finding jobs by natural-language description, skill match, or profile.
     Examples: 'find Python server jobs', 'jobs at fintech startups'
     """
-    collection = _collection()
-    hits = chroma_search(collection, query, n_results=n_results)
+    try:
+        collection = _collection()
+        hits = chroma_search(collection, query, n_results=n_results)
+    except Exception as e:
+        log.warning("ChromaDB unavailable, semantic search skipped: %s", e)
+        return {"jobs": [], "note": "Semantic search unavailable; use search_jobs_by_criteria instead."}
+
     job_ids = [h["metadata"]["job_id"] for h in hits]
 
     conn = _conn()
