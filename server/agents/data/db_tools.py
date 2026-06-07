@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Optional
 
 import psycopg2
@@ -20,8 +21,16 @@ def _conn():
     return get_connection()
 
 
+_chroma_collection = None
+_chroma_lock = threading.Lock()
+
 def _collection():
-    return init_chroma()
+    global _chroma_collection
+    if _chroma_collection is None:
+        with _chroma_lock:
+            if _chroma_collection is None:
+                _chroma_collection = init_chroma()
+    return _chroma_collection
 
 
 def _run_query(sql: str, params: tuple = (), description: str = ""):
